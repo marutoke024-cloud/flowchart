@@ -869,24 +869,34 @@ button {
   justify-content: center;
   pointer-events: none;
 }
+/* tilt + vertical squash turns the spinning circle into a diagonal ellipse */
+.home-tilt {
+  position: relative;
+  width: 0;
+  height: 0;
+  transform: rotate(-16deg) scaleY(0.62);
+}
 .home-ring {
   position: relative;
   width: 0;
   height: 0;
-  animation: orbspin 90s linear infinite;
+  animation: orbspin 105s linear infinite;
 }
 @keyframes orbspin { to { transform: rotate(360deg); } }
 @keyframes orbspinrev { to { transform: rotate(-360deg); } }
 .orb-slot {
   position: absolute;
-  margin: -17px;
 }
-.orb-counter { animation: orbspinrev 90s linear infinite; }
-.orb-shape {
+.orb-counter {
+  animation: orbspinrev 105s linear infinite;
+}
+/* undo the parent tilt/squash so each tile stays upright and unsquished */
+.orb-deskew {
+  transform: scaleY(1.613) rotate(16deg);
+}
+.orb-deskew svg {
   display: block;
-  width: 34px;
-  height: 34px;
-  box-shadow: var(--shadow-sm);
+  filter: drop-shadow(0 4px 10px rgba(34, 39, 37, 0.16));
 }
 
 .home-hero {

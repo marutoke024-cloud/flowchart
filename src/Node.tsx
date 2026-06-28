@@ -33,6 +33,10 @@ function ShapeBg({ node }: { node: DiagramNode }) {
   const stroke = borderStyle === "none" ? "none" : borderColor;
   const dash = borderStyle === "dashed" ? `${borderWidth * 3} ${borderWidth * 2}` : undefined;
   const inset = borderWidth / 2 + 0.5;
+  // structural detail lines (predefined bars, database rim) must stay visible
+  // even when the box has no border — fall back to the contrasting text colour.
+  const ink = borderStyle === "none" ? node.textColor : borderColor;
+  const inkW = borderStyle === "none" ? 2 : borderWidth;
   const common = {
     fill,
     stroke,
@@ -65,44 +69,49 @@ function ShapeBg({ node }: { node: DiagramNode }) {
       break;
     }
     case "predefined": {
-      const bar = Math.min(16, w * 0.12);
+      const bar = Math.min(18, w * 0.12);
       el = (
         <g>
           <rect x={inset} y={inset} width={w - inset * 2} height={h - inset * 2} {...common} />
-          <line x1={inset + bar} y1={inset} x2={inset + bar} y2={h - inset} stroke={stroke} strokeWidth={common.strokeWidth || 2} />
-          <line x1={w - inset - bar} y1={inset} x2={w - inset - bar} y2={h - inset} stroke={stroke} strokeWidth={common.strokeWidth || 2} />
+          <line x1={inset + bar} y1={inset} x2={inset + bar} y2={h - inset} stroke={ink} strokeWidth={inkW} vectorEffect="non-scaling-stroke" />
+          <line x1={w - inset - bar} y1={inset} x2={w - inset - bar} y2={h - inset} stroke={ink} strokeWidth={inkW} vectorEffect="non-scaling-stroke" />
         </g>
       );
       break;
     }
     case "database": {
       const rx = w / 2 - inset;
-      const ry = Math.min(h * 0.16, 16);
+      const ry = Math.min(h * 0.18, 18);
       const cx = w / 2;
       const top = inset + ry;
       const bot = h - inset - ry;
-      const body = `M ${inset} ${top} L ${inset} ${bot} A ${rx} ${ry} 0 0 0 ${w - inset} ${bot} L ${w - inset} ${top} A ${rx} ${ry} 0 0 1 ${inset} ${top} Z`;
+      const body = `M ${inset} ${top} L ${inset} ${bot} A ${rx} ${ry} 0 0 0 ${w - inset} ${bot} L ${w - inset} ${top}`;
       el = (
         <g>
-          <path d={body} {...common} />
-          <ellipse cx={cx} cy={top} rx={rx} ry={ry} fill="none" stroke={stroke} strokeWidth={common.strokeWidth} strokeDasharray={dash} vectorEffect="non-scaling-stroke" />
+          {/* cylinder body */}
+          <path d={`${body} A ${rx} ${ry} 0 0 1 ${inset} ${top} Z`} fill={fill} stroke="none" />
+          {/* lighter top cap so it reads as a cylinder */}
+          <ellipse cx={cx} cy={top} rx={rx} ry={ry} fill="rgba(255,255,255,0.22)" stroke={ink} strokeWidth={inkW} vectorEffect="non-scaling-stroke" />
+          {/* left side, bottom arc, right side */}
+          <path d={body} fill="none" stroke={ink} strokeWidth={inkW} strokeDasharray={dash} vectorEffect="non-scaling-stroke" />
         </g>
       );
       break;
     }
     case "multidoc": {
-      const off = 6;
+      const off = 7;
       const amp = Math.min(12, h * 0.12);
       const x0 = inset;
       const x1 = w - inset - off * 2;
       const docTop = inset + off * 2;
       const docBot = h - inset;
       const wave = `M ${x0} ${docTop} L ${x1} ${docTop} L ${x1} ${docBot - amp} C ${x1 - (x1 - x0) * 0.25} ${docBot + amp} ${x0 + (x1 - x0) * 0.25} ${docBot - amp * 2} ${x0} ${docBot - amp} Z`;
+      const stack = { fill, stroke: ink, strokeWidth: inkW, vectorEffect: "non-scaling-stroke" as const };
       el = (
         <g>
-          <rect x={inset + off * 2} y={inset} width={w - inset * 2 - off * 2} height={h - inset * 2 - off * 2} {...common} />
-          <rect x={inset + off} y={inset + off} width={w - inset * 2 - off * 2} height={h - inset * 2 - off * 2} {...common} />
-          <path d={wave} {...common} />
+          <rect x={inset + off * 2} y={inset} width={w - inset * 2 - off * 2} height={h - inset * 2 - off * 2} {...stack} />
+          <rect x={inset + off} y={inset + off} width={w - inset * 2 - off * 2} height={h - inset * 2 - off * 2} {...stack} />
+          <path d={wave} {...stack} />
         </g>
       );
       break;
