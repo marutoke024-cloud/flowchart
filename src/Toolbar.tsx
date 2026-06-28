@@ -8,12 +8,14 @@ import {
   IconFit,
   IconExport,
   IconImport,
+  IconFrame,
 } from "./icons";
 import type { DiagramEdge, DiagramNode } from "./types";
 import ThemeMenu from "./ThemeMenu";
 
 export default function Toolbar() {
   const addNode = useStore((s) => s.addNode);
+  const addFrame = useStore((s) => s.addFrame);
   const undo = useStore((s) => s.undo);
   const redo = useStore((s) => s.redo);
   const setViewport = useStore((s) => s.setViewport);
@@ -27,6 +29,12 @@ export default function Toolbar() {
     const vp = useStore.getState().viewport;
     const c = viewCenter(vp, window.innerWidth, window.innerHeight);
     addNode(c.x, c.y);
+  };
+
+  const onAddFrame = () => {
+    const vp = useStore.getState().viewport;
+    const c = viewCenter(vp, window.innerWidth, window.innerHeight);
+    addFrame(c.x, c.y);
   };
 
   const onFit = () => {
@@ -78,6 +86,10 @@ export default function Toolbar() {
       <button className="tbtn primary" onClick={onAdd} title="Add box">
         <IconPlus />
         <span className="lbl">Add</span>
+      </button>
+      <button className="tbtn" onClick={onAddFrame} title="Add frame (group container)">
+        <IconFrame />
+        <span className="lbl">Frame</span>
       </button>
 
       <button className="tbtn" onClick={undo} disabled={!canUndo} title="Undo (⌘Z)">

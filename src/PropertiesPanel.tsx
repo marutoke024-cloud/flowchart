@@ -2,11 +2,21 @@ import { useRef } from "react";
 import { useStore } from "./store";
 import { themeByName } from "./theme";
 import { bestTextColor, fileToDataUrl } from "./utils";
-import { IconImage, IconTrash } from "./icons";
+import { IconImage, IconTag, IconTrash } from "./icons";
 import { ShapeIcon } from "./icons";
 import type { ShapeKind } from "./types";
 
-const SHAPES: ShapeKind[] = ["rounded", "rect", "diamond", "ellipse", "hexagon"];
+const SHAPES: ShapeKind[] = [
+  "rounded",
+  "rect",
+  "diamond",
+  "ellipse",
+  "circle",
+  "hexagon",
+  "parallelogram",
+];
+
+const LABEL_COLORS = ["#ef4444", "#f59e0b", "#22c55e", "#0ea5e9", "#8b5cf6", "#64748b"];
 
 function NodePanel({ id }: { id: string }) {
   const node = useStore((s) => s.nodes.find((n) => n.id === id))!;
@@ -187,9 +197,109 @@ function NodePanel({ id }: { id: string }) {
         </button>
       </div>
 
+      <div>
+        <h4>Corner label</h4>
+        {node.label === undefined ? (
+          <button
+            className="panel-btn"
+            onClick={() => set({ label: { text: "Label", color: LABEL_COLORS[0] } }, true)}
+          >
+            <IconTag />
+            Add label
+          </button>
+        ) : (
+          <>
+            <div className="swatches">
+              {LABEL_COLORS.map((c) => (
+                <button
+                  key={c}
+                  className={`swatch ${node.label!.color === c ? "active" : ""}`}
+                  style={{ background: c }}
+                  onClick={() => set({ label: { ...node.label!, color: c } }, true)}
+                />
+              ))}
+              <label className="swatch-custom" title="Custom label color">
+                <input
+                  type="color"
+                  value={node.label.color}
+                  onPointerDown={() => commit()}
+                  onChange={(e) => set({ label: { ...node.label!, color: e.target.value } })}
+                />
+              </label>
+            </div>
+            <button
+              className="panel-btn"
+              style={{ marginTop: 8 }}
+              onClick={() => set({ label: undefined }, true)}
+            >
+              Remove label
+            </button>
+          </>
+        )}
+      </div>
+
       <button className="panel-btn danger" onClick={() => removeNode(id)}>
         <IconTrash />
         Delete node
+      </button>
+    </div>
+  );
+}
+
+function FramePanel({ id }: { id: string }) {
+  const node = useStore((s) => s.nodes.find((n) => n.id === id));
+  const updateNode = useStore((s) => s.updateNode);
+  const removeNode = useStore((s) => s.removeNode);
+  const commit = useStore((s) => s.commit);
+  if (!node) return null;
+
+  const FILLS = ["#fbf7e9", "#eef2ff", "#ecfdf5", "#fdf2f8", "#f1f5f9", "#ffffff"];
+
+  return (
+    <div className="panel">
+      <div>
+        <h4>Frame fill</h4>
+        <div className="swatches">
+          {FILLS.map((c) => (
+            <button
+              key={c}
+              className={`swatch ${node.fill === c ? "active" : ""}`}
+              style={{ background: c }}
+              onClick={() => {
+                commit();
+                updateNode(id, { fill: c });
+              }}
+            />
+          ))}
+          <label className="swatch-custom" title="Custom fill">
+            <input
+              type="color"
+              value={node.fill}
+              onPointerDown={() => commit()}
+              onChange={(e) => updateNode(id, { fill: e.target.value })}
+            />
+          </label>
+        </div>
+      </div>
+      <div>
+        <h4>Frame accent</h4>
+        <div className="swatches">
+          <label className="swatch-custom" title="Title & border color">
+            <input
+              type="color"
+              value={node.borderColor}
+              onPointerDown={() => commit()}
+              onChange={(e) => updateNode(id, { borderColor: e.target.value })}
+            />
+          </label>
+          <span style={{ fontSize: 12, color: "var(--muted)", alignSelf: "center" }}>
+            Title &amp; border
+          </span>
+        </div>
+      </div>
+      <button className="panel-btn danger" onClick={() => removeNode(id)}>
+        <IconTrash />
+        Delete frame
       </button>
     </div>
   );
@@ -253,7 +363,8 @@ function EdgePanel({ id }: { id: string }) {
 export default function PropertiesPanel() {
   const selectedId = useStore((s) => s.selectedId);
   const selectedEdgeId = useStore((s) => s.selectedEdgeId);
-  if (selectedId) return <NodePanel id={selectedId} />;
+  const selectedKind = useStore((s) => s.nodes.find((n) => n.id === s.selectedId)?.kind);
+  if (selectedId) return selectedKind === "frame" ? <FramePanel id={selectedId} /> : <NodePanel id={selectedId} />;
   if (selectedEdgeId) return <EdgePanel id={selectedEdgeId} />;
   return null;
 }

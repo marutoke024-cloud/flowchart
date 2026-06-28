@@ -8,13 +8,15 @@ import type {
   Viewport,
 } from "./types";
 import {
+  arrowColor,
   DEFAULT_COLOR_KEY,
   DEFAULT_THEME,
-  EDGE_COLOR,
+  FRAME_DEFAULTS,
   NODE_DEFAULTS,
   themeByName,
 } from "./theme";
 import { bestTextColor } from "./utils";
+import type { Side } from "./types";
 
 const STORAGE_KEY = "flowmin.diagram.v1";
 const HISTORY_LIMIT = 60;
@@ -86,11 +88,12 @@ export interface DiagramState {
 
   // node ops
   addNode: (x: number, y: number, shape?: ShapeKind) => string;
+  addFrame: (x: number, y: number) => string;
   updateNode: (id: string, patch: Partial<DiagramNode>) => void;
   removeNode: (id: string) => void;
 
   // edge ops
-  addEdge: (from: string, to: string) => void;
+  addEdge: (from: string, to: string, fromSide?: Side, toSide?: Side) => void;
   updateEdge: (id: string, patch: Partial<DiagramEdge>) => void;
   removeEdge: (id: string) => void;
 
@@ -145,10 +148,14 @@ export const useStore = create<DiagramState>((set, get) => ({
       theme: name,
       // recolour boxes that follow a theme slot; custom colours are left as-is
       nodes: s.nodes.map((n) => {
-        if (n.colorKey === undefined) return n;
+        if (n.kind === "frame" || n.colorKey === undefined) return n;
         const fill = palette.colors[n.colorKey] ?? n.fill;
         return { ...n, fill, textColor: bestTextColor(fill) };
       }),
+      // recolour connectors that follow the theme
+      edges: s.edges.map((e) =>
+        e.themed === false ? e : { ...e, color: palette.arrow },
+      ),
     }));
     persist(get());
   },
@@ -184,6 +191,36 @@ export const useStore = create<DiagramState>((set, get) => ({
     return id;
   },
 
+  addFrame: (x, y) => {
+    get().commit();
+    const id = nanoid(8);
+    const frame: DiagramNode = {
+      id,
+      kind: "frame",
+      x: Math.round(x - FRAME_DEFAULTS.width / 2),
+      y: Math.round(y - FRAME_DEFAULTS.height / 2),
+      width: FRAME_DEFAULTS.width,
+      height: FRAME_DEFAULTS.height,
+      shape: "rounded",
+      text: "",
+      fill: FRAME_DEFAULTS.fill,
+      textColor: "#475569",
+      borderColor: FRAME_DEFAULTS.borderColor,
+      borderWidth: 2,
+      borderStyle: "solid",
+      roundness: 16,
+    };
+    // frames go to the back so regular nodes render on top
+    set((s) => ({
+      nodes: [frame, ...s.nodes],
+      selectedId: id,
+      selectedEdgeId: null,
+      editingId: null,
+    }));
+    persist(get());
+    return id;
+  },
+
   updateNode: (id, patch) => {
     set((s) => ({
       nodes: s.nodes.map((n) => (n.id === id ? { ...n, ...patch } : n)),
@@ -202,7 +239,7 @@ export const useStore = create<DiagramState>((set, get) => ({
     persist(get());
   },
 
-  addEdge: (from, to) => {
+  addEdge: (from, to, fromSide, toSide) => {
     if (from === to) return;
     const exists = get().edges.some(
       (e) =>
@@ -214,7 +251,10 @@ export const useStore = create<DiagramState>((set, get) => ({
       id: nanoid(8),
       from,
       to,
-      color: EDGE_COLOR,
+      fromSide,
+      toSide,
+      color: arrowColor(get().theme),
+      themed: true,
     };
     set((s) => ({ edges: [...s.edges, edge] }));
     persist(get());

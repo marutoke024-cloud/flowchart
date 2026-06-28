@@ -1,9 +1,16 @@
 import { useStore } from "./store";
-import { borderPoint, edgePath, nodeCenter } from "./geometry";
+import {
+  chooseSides,
+  orthoPoints,
+  orthoToPoint,
+  polylineMidpoint,
+  roundedPath,
+} from "./geometry";
 import type { Point } from "./geometry";
+import type { Side } from "./types";
 
 interface Props {
-  tempLink: { from: string; to: Point } | null;
+  tempLink: { from: string; fromSide: Side; to: Point } | null;
 }
 
 export default function Edges({ tempLink }: Props) {
@@ -17,10 +24,10 @@ export default function Edges({ tempLink }: Props) {
   return (
     <svg className="edge-layer" width={1} height={1}>
       <defs>
-        <marker id="arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
           <path d="M0 0 L10 5 L0 10 z" fill="context-stroke" />
         </marker>
-        <marker id="arrow-sel" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <marker id="arrow-sel" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
           <path d="M0 0 L10 5 L0 10 z" fill="#4f46e5" />
         </marker>
       </defs>
@@ -29,12 +36,12 @@ export default function Edges({ tempLink }: Props) {
         const a = byId.get(e.from);
         const b = byId.get(e.to);
         if (!a || !b) return null;
-        const pa = borderPoint(a, nodeCenter(b));
-        const pb = borderPoint(b, nodeCenter(a));
-        const d = edgePath(pa, pb);
+        const [autoA, autoB] = chooseSides(a, b);
+        const pts = orthoPoints(a, e.fromSide ?? autoA, b, e.toSide ?? autoB);
+        const d = roundedPath(pts);
         const sel = selectedEdgeId === e.id;
         const stroke = sel ? "#4f46e5" : e.color;
-        const mid = { x: (pa.x + pb.x) / 2, y: (pa.y + pb.y) / 2 };
+        const mid = polylineMidpoint(pts);
         return (
           <g key={e.id}>
             <path
@@ -53,7 +60,9 @@ export default function Edges({ tempLink }: Props) {
               fill="none"
               stroke={stroke}
               strokeWidth={sel ? 2.6 : 2}
-              strokeDasharray={e.dashed ? "6 5" : undefined}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+              strokeDasharray={e.dashed ? "6 6" : undefined}
               markerEnd={`url(#${sel ? "arrow-sel" : "arrow"})`}
               style={{ pointerEvents: "none" }}
             />
@@ -70,14 +79,15 @@ export default function Edges({ tempLink }: Props) {
         (() => {
           const a = byId.get(tempLink.from);
           if (!a) return null;
-          const pa = borderPoint(a, tempLink.to);
+          const pts = orthoToPoint(a, tempLink.fromSide, tempLink.to);
           return (
             <path
-              d={edgePath(pa, tempLink.to)}
+              d={roundedPath(pts)}
               fill="none"
               stroke="#4f46e5"
               strokeWidth={2}
               strokeDasharray="5 5"
+              strokeLinejoin="round"
               markerEnd="url(#arrow-sel)"
               style={{ pointerEvents: "none" }}
             />

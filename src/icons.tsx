@@ -26,6 +26,12 @@ export const IconImage = () => (
 export const IconTrash = () => (
   <svg viewBox="0 0 24 24" {...s}><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /></svg>
 );
+export const IconFrame = () => (
+  <svg viewBox="0 0 24 24" {...s}><path d="M4 8h16M4 16h16M8 4v16M16 4v16" /><rect x="3" y="3" width="18" height="18" rx="2" /></svg>
+);
+export const IconTag = () => (
+  <svg viewBox="0 0 24 24" {...s}><path d="M20.6 13.4 13 21a2 2 0 0 1-2.8 0l-7-7a2 2 0 0 1 0-2.8L10.8 3H20a1 1 0 0 1 1 1v9.4Z" /><circle cx="16.5" cy="7.5" r="1.2" fill="currentColor" stroke="none" /></svg>
+);
 export const IconPalette = () => (
   <svg viewBox="0 0 24 24" {...s}><path d="M12 22a10 10 0 1 1 0-20c5.5 0 10 3.8 10 8.5 0 3-2.5 4.5-5 4.5h-1.8c-.8 0-1.5.7-1.5 1.5 0 .4.2.8.4 1 .3.4.5.8.5 1.3 0 1.2-1 2.2-2.1 2.2Z" /><circle cx="7.5" cy="11" r="1" fill="currentColor" stroke="none" /><circle cx="12" cy="7.5" r="1" fill="currentColor" stroke="none" /><circle cx="16.5" cy="11" r="1" fill="currentColor" stroke="none" /></svg>
 );
@@ -46,5 +52,9 @@ export function ShapeIcon({ kind }: { kind: ShapeKind }) {
       return <svg viewBox="0 0 24 24" width={20} height={20}><ellipse cx="12" cy="12" rx="9" ry="6.5" {...p} /></svg>;
     case "hexagon":
       return <svg viewBox="0 0 24 24" width={20} height={20}><path d="M7 5h10l4 7-4 7H7l-4-7Z" {...p} /></svg>;
+    case "circle":
+      return <svg viewBox="0 0 24 24" width={20} height={20}><circle cx="12" cy="12" r="8.5" {...p} /></svg>;
+    case "parallelogram":
+      return <svg viewBox="0 0 24 24" width={20} height={20}><path d="M8 6h13l-5 12H3Z" {...p} /></svg>;
   }
 }

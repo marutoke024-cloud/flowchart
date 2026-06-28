@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useStore } from "./store";
-import { clamp, screenToWorld } from "./geometry";
+import { clamp, nearestSide, nodeCenter, screenToWorld } from "./geometry";
 import type { Point } from "./geometry";
-import type { Viewport } from "./types";
+import type { Side, Viewport } from "./types";
 import Node from "./Node";
+import Frame from "./Frame";
 import Edges from "./Edges";
 
 const MIN_ZOOM = 0.2;
@@ -27,7 +28,7 @@ export default function Canvas() {
   const addEdge = useStore((s) => s.addEdge);
 
   const [panning, setPanning] = useState(false);
-  const [tempLink, setTempLink] = useState<{ from: string; to: Point } | null>(null);
+  const [tempLink, setTempLink] = useState<{ from: string; fromSide: Side; to: Point } | null>(null);
 
   // active pointers for pan / pinch
   const pointers = useRef<Map<number, { x: number; y: number }>>(new Map());
@@ -106,22 +107,37 @@ export default function Canvas() {
     return () => el.removeEventListener("wheel", onWheel);
   }, [setViewport]);
 
-  // --- linking flow started from node handles ---
-  const startLink = (fromId: string, clientX: number, clientY: number) => {
+  // --- linking flow started from node side handles ---
+  const startLink = (fromId: string, fromSide: Side, clientX: number, clientY: number) => {
     const r = rect();
     const vp = useStore.getState().viewport;
-    setTempLink({ from: fromId, to: screenToWorld(clientX - r.left, clientY - r.top, vp) });
+    setTempLink({ from: fromId, fromSide, to: screenToWorld(clientX - r.left, clientY - r.top, vp) });
 
     const move = (ev: PointerEvent) => {
       const cur = useStore.getState().viewport;
-      setTempLink({ from: fromId, to: screenToWorld(ev.clientX - r.left, ev.clientY - r.top, cur) });
+      setTempLink({ from: fromId, fromSide, to: screenToWorld(ev.clientX - r.left, ev.clientY - r.top, cur) });
     };
     const up = (ev: PointerEvent) => {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
       const target = document.elementFromPoint(ev.clientX, ev.clientY)?.closest("[data-node-id]");
       const toId = target?.getAttribute("data-node-id");
-      if (toId && toId !== fromId) addEdge(fromId, toId);
+      if (toId && toId !== fromId) {
+        const all = useStore.getState().nodes;
+        const node = all.find((n) => n.id === toId);
+        const src = all.find((n) => n.id === fromId);
+        const cur = useStore.getState().viewport;
+        const wp = screenToWorld(ev.clientX - r.left, ev.clientY - r.top, cur);
+        let toSide = node ? nearestSide(node, wp) : undefined;
+        // if dropped near the centre, attach to the side facing the source
+        if (node && src) {
+          const c = nodeCenter(node);
+          const nx = (wp.x - c.x) / (node.width / 2 || 1);
+          const ny = (wp.y - c.y) / (node.height / 2 || 1);
+          if (Math.hypot(nx, ny) < 0.45) toSide = nearestSide(node, nodeCenter(src));
+        }
+        addEdge(fromId, toId, fromSide, toSide);
+      }
       setTempLink(null);
     };
     window.addEventListener("pointermove", move);
@@ -149,8 +165,11 @@ export default function Canvas() {
         className="world"
         style={{ transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})` }}
       >
+        {nodes.filter((n) => n.kind === "frame").map((n) => (
+          <Frame key={n.id} node={n} />
+        ))}
         <Edges tempLink={tempLink} />
-        {nodes.map((n) => (
+        {nodes.filter((n) => n.kind !== "frame").map((n) => (
           <Node key={n.id} node={n} startLink={startLink} />
         ))}
       </div>
