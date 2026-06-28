@@ -1,7 +1,7 @@
 import { useRef } from "react";
 import { useStore } from "./store";
 import { themeByName } from "./theme";
-import { bestTextColor, fileToDataUrl } from "./utils";
+import { bestTextColor, fileToDataUrl, frameAccent } from "./utils";
 import { IconImage, IconTag, IconTrash } from "./icons";
 import { ShapeIcon } from "./icons";
 import type { ShapeKind } from "./types";
@@ -267,7 +267,7 @@ function FramePanel({ id }: { id: string }) {
               style={{ background: c }}
               onClick={() => {
                 commit();
-                updateNode(id, { fill: c });
+                updateNode(id, { fill: c, borderColor: frameAccent(c) });
               }}
             />
           ))}
@@ -276,30 +276,82 @@ function FramePanel({ id }: { id: string }) {
               type="color"
               value={node.fill}
               onPointerDown={() => commit()}
-              onChange={(e) => updateNode(id, { fill: e.target.value })}
+              onChange={(e) => updateNode(id, { fill: e.target.value, borderColor: frameAccent(e.target.value) })}
             />
           </label>
         </div>
-      </div>
-      <div>
-        <h4>Frame accent</h4>
-        <div className="swatches">
-          <label className="swatch-custom" title="Title & border color">
-            <input
-              type="color"
-              value={node.borderColor}
-              onPointerDown={() => commit()}
-              onChange={(e) => updateNode(id, { borderColor: e.target.value })}
-            />
-          </label>
-          <span style={{ fontSize: 12, color: "var(--muted)", alignSelf: "center" }}>
-            Title &amp; border
-          </span>
-        </div>
+        <p style={{ margin: "8px 2px 0", fontSize: 12, color: "var(--muted)" }}>
+          The title &amp; border accent follows the fill automatically.
+        </p>
       </div>
       <button className="panel-btn danger" onClick={() => removeNode(id)}>
         <IconTrash />
         Delete frame
+      </button>
+    </div>
+  );
+}
+
+function TextPanel({ id }: { id: string }) {
+  const node = useStore((s) => s.nodes.find((n) => n.id === id));
+  const updateNode = useStore((s) => s.updateNode);
+  const removeNode = useStore((s) => s.removeNode);
+  const commit = useStore((s) => s.commit);
+  if (!node) return null;
+
+  const set = (patch: Parameters<typeof updateNode>[1], history = false) => {
+    if (history) commit();
+    updateNode(id, patch);
+  };
+
+  return (
+    <div className="panel">
+      <div className="field">
+        <label>Size</label>
+        <input
+          type="range"
+          min={12}
+          max={64}
+          value={node.fontSize ?? 18}
+          onPointerDown={() => commit()}
+          onChange={(e) => set({ fontSize: Number(e.target.value) })}
+        />
+        <span className="val">{node.fontSize ?? 18}</span>
+      </div>
+      <div className="field">
+        <label>Bold</label>
+        <button
+          className="panel-btn"
+          style={{ width: "auto", padding: "0 16px", fontWeight: node.bold ? 800 : 600 }}
+          onClick={() => set({ bold: !node.bold }, true)}
+        >
+          {node.bold ? "On" : "Off"}
+        </button>
+      </div>
+      <div>
+        <h4>Color</h4>
+        <div className="swatches">
+          {["#1b1d1a", "#ffffff", "#4f46e5", "#16a34a", "#dc2626", "#f59e0b"].map((c) => (
+            <button
+              key={c}
+              className={`swatch ${node.textColor === c ? "active" : ""}`}
+              style={{ background: c }}
+              onClick={() => set({ textColor: c }, true)}
+            />
+          ))}
+          <label className="swatch-custom" title="Custom text color">
+            <input
+              type="color"
+              value={node.textColor}
+              onPointerDown={() => commit()}
+              onChange={(e) => set({ textColor: e.target.value })}
+            />
+          </label>
+        </div>
+      </div>
+      <button className="panel-btn danger" onClick={() => removeNode(id)}>
+        <IconTrash />
+        Delete text
       </button>
     </div>
   );
@@ -455,6 +507,7 @@ export default function PropertiesPanel() {
   if (selectedId) {
     if (selectedKind === "frame") return <FramePanel id={selectedId} />;
     if (selectedKind === "image") return <ImagePanel id={selectedId} />;
+    if (selectedKind === "text") return <TextPanel id={selectedId} />;
     return <NodePanel id={selectedId} />;
   }
   if (selectedEdgeId) return <EdgePanel id={selectedEdgeId} />;

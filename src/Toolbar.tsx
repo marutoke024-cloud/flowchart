@@ -1,6 +1,6 @@
 import { useRef } from "react";
 import { useStore } from "./store";
-import { fitViewport, viewCenter, downloadJson, fileToDataUrl } from "./utils";
+import { fitViewport, viewCenter, downloadJson, fileToDataUrl, emptySpot } from "./utils";
 import {
   IconPlus,
   IconUndo,
@@ -11,7 +11,19 @@ import {
   IconFrame,
   IconImage,
   IconSidebar,
+  IconText,
 } from "./icons";
+
+const NODE_W = 208;
+const NODE_H = 96;
+
+/** Centre point for a new element, nudged to an empty spot. */
+function placement(w: number, h: number) {
+  const vp = useStore.getState().viewport;
+  const c = viewCenter(vp, window.innerWidth, window.innerHeight);
+  const boxes = useStore.getState().nodes.filter((n) => n.kind !== "frame");
+  return emptySpot(boxes, c.x, c.y, w, h);
+}
 import type { DiagramEdge, DiagramNode } from "./types";
 import ThemeMenu from "./ThemeMenu";
 
@@ -19,6 +31,7 @@ export default function Toolbar() {
   const addNode = useStore((s) => s.addNode);
   const addFrame = useStore((s) => s.addFrame);
   const addImageNode = useStore((s) => s.addImageNode);
+  const addText = useStore((s) => s.addText);
   const toggleLeftPanel = useStore((s) => s.toggleLeftPanel);
   const leftPanelOpen = useStore((s) => s.leftPanelOpen);
   const undo = useStore((s) => s.undo);
@@ -42,9 +55,8 @@ export default function Toolbar() {
         const scale = Math.min(1, max / Math.max(img.width, img.height));
         const w = Math.max(80, Math.round(img.width * scale));
         const h = Math.max(60, Math.round(img.height * scale));
-        const vp = useStore.getState().viewport;
-        const c = viewCenter(vp, window.innerWidth, window.innerHeight);
-        addImageNode(c.x, c.y, url, w, h);
+        const p = placement(w, h);
+        addImageNode(p.x, p.y, url, w, h);
       };
       img.src = url;
     } catch {
@@ -54,15 +66,18 @@ export default function Toolbar() {
   };
 
   const onAdd = () => {
-    const vp = useStore.getState().viewport;
-    const c = viewCenter(vp, window.innerWidth, window.innerHeight);
-    addNode(c.x, c.y);
+    const p = placement(NODE_W, NODE_H);
+    addNode(p.x, p.y);
   };
 
   const onAddFrame = () => {
-    const vp = useStore.getState().viewport;
-    const c = viewCenter(vp, window.innerWidth, window.innerHeight);
-    addFrame(c.x, c.y);
+    const p = placement(460, 320);
+    addFrame(p.x, p.y);
+  };
+
+  const onAddText = () => {
+    const p = placement(180, 40);
+    addText(p.x, p.y);
   };
 
   const onFit = () => {
@@ -114,6 +129,10 @@ export default function Toolbar() {
       <button className="tbtn primary" onClick={onAdd} title="Add box">
         <IconPlus />
         <span className="lbl">Add</span>
+      </button>
+      <button className="tbtn" onClick={onAddText} title="Add text to the board">
+        <IconText />
+        <span className="lbl">Text</span>
       </button>
       <button className="tbtn" onClick={onAddFrame} title="Add frame (group container)">
         <IconFrame />

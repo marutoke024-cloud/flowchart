@@ -15,7 +15,7 @@ import {
   NODE_DEFAULTS,
   themeByName,
 } from "./theme";
-import { bestTextColor } from "./utils";
+import { bestTextColor, frameAccent, tint } from "./utils";
 import type { Side } from "./types";
 
 const STORAGE_KEY = "flowmin.diagram.v1";
@@ -96,6 +96,7 @@ export interface DiagramState {
   addNode: (x: number, y: number, shape?: ShapeKind) => string;
   addFrame: (x: number, y: number) => string;
   addImageNode: (x: number, y: number, image: string, width: number, height: number) => string;
+  addText: (x: number, y: number) => string;
   updateNode: (id: string, patch: Partial<DiagramNode>) => void;
   removeNode: (id: string) => void;
 
@@ -159,9 +160,14 @@ export const useStore = create<DiagramState>((set, get) => ({
     const palette = themeByName(name);
     set((s) => ({
       theme: name,
-      // recolour boxes that follow a theme slot; custom colours are left as-is
+      // recolour boxes that follow a theme slot; frames get a tinted fill +
+      // matching accent; custom box colours are left as-is
       nodes: s.nodes.map((n) => {
-        if (n.kind === "frame" || n.colorKey === undefined) return n;
+        if (n.kind === "frame") {
+          const fill = tint(palette.colors[0], 0.86);
+          return { ...n, fill, borderColor: frameAccent(fill) };
+        }
+        if (n.colorKey === undefined) return n;
         const fill = palette.colors[n.colorKey] ?? n.fill;
         return { ...n, fill, textColor: bestTextColor(fill) };
       }),
@@ -218,7 +224,7 @@ export const useStore = create<DiagramState>((set, get) => ({
       text: "",
       fill: FRAME_DEFAULTS.fill,
       textColor: "#475569",
-      borderColor: FRAME_DEFAULTS.borderColor,
+      borderColor: frameAccent(FRAME_DEFAULTS.fill),
       borderWidth: 2,
       borderStyle: "solid",
       roundness: 16,
@@ -264,6 +270,37 @@ export const useStore = create<DiagramState>((set, get) => ({
     return id;
   },
 
+  addText: (x, y) => {
+    get().commit();
+    const id = nanoid(8);
+    const node: DiagramNode = {
+      id,
+      kind: "text",
+      x: Math.round(x - 90),
+      y: Math.round(y - 16),
+      width: 180,
+      height: 32,
+      shape: "rounded",
+      text: "",
+      fill: "transparent",
+      textColor: "#1b1d1a",
+      borderColor: "transparent",
+      borderWidth: 0,
+      borderStyle: "none",
+      roundness: 0,
+      fontSize: 18,
+      bold: false,
+    };
+    set((s) => ({
+      nodes: [...s.nodes, node],
+      selectedId: id,
+      selectedEdgeId: null,
+      editingId: id,
+    }));
+    persist(get());
+    return id;
+  },
+
   updateNode: (id, patch) => {
     set((s) => ({
       nodes: s.nodes.map((n) => (n.id === id ? { ...n, ...patch } : n)),
@@ -284,9 +321,10 @@ export const useStore = create<DiagramState>((set, get) => ({
 
   addEdge: (from, to, fromSide, toSide) => {
     if (from === to) return;
+    // only block an identical connector (same direction + same anchors);
+    // reverse direction or a different anchor pair is allowed
     const exists = get().edges.some(
-      (e) =>
-        (e.from === from && e.to === to) || (e.from === to && e.to === from),
+      (e) => e.from === from && e.to === to && e.fromSide === fromSide && e.toSide === toSide,
     );
     if (exists) return;
     get().commit();

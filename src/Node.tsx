@@ -94,6 +94,7 @@ export default function Node({ node, startLink }: Props) {
   const dragState = useRef<{ sx: number; sy: number; ox: number; oy: number; moved: boolean } | null>(null);
   const elRef = useRef<HTMLDivElement>(null);
   const isImage = node.kind === "image";
+  const isText = node.kind === "text";
 
   // Height follows content (text wrap, image, notes); width is user-controlled.
   // Measured height is written back so the shape background and edges stay in sync.
@@ -179,7 +180,7 @@ export default function Node({ node, startLink }: Props) {
   return (
     <div
       ref={elRef}
-      className={`node node-${node.shape} ${isImage ? "node-imagebox" : ""} ${selected ? "selected" : ""}`}
+      className={`node node-${node.shape} ${isImage ? "node-imagebox" : ""} ${isText ? "node-textbox" : ""} ${selected ? "selected" : ""}`}
       data-node-id={node.id}
       style={{ left: node.x, top: node.y, width: node.width, ...(isImage ? { height: node.height } : {}) }}
       onPointerDown={onPointerDown}
@@ -189,7 +190,25 @@ export default function Node({ node, startLink }: Props) {
         else setEditing(node.id);
       }}
     >
-      {isImage ? (
+      {isText ? (
+        <div
+          className="node-freetext"
+          style={{
+            fontSize: node.fontSize ?? 18,
+            color: node.textColor,
+            fontWeight: node.bold ? 700 : 500,
+          }}
+        >
+          <EditableText
+            className="node-freetext-edit"
+            value={node.text}
+            editing={editing}
+            placeholder="Text…"
+            onChange={(v) => updateNode(node.id, { text: v })}
+            onCommit={commit}
+          />
+        </div>
+      ) : isImage ? (
         <>
           <img
             className="node-fill-image"
@@ -299,10 +318,14 @@ export default function Node({ node, startLink }: Props) {
       )}
 
       {/* side anchors: hidden until hover/selected, used to draw connectors */}
-      <div className="handle t" onPointerDown={handle("t")} />
-      <div className="handle b" onPointerDown={handle("b")} />
-      <div className="handle l" onPointerDown={handle("l")} />
-      <div className="handle r" onPointerDown={handle("r")} />
+      {!isText && (
+        <>
+          <div className="handle t" onPointerDown={handle("t")} />
+          <div className="handle b" onPointerDown={handle("b")} />
+          <div className="handle l" onPointerDown={handle("l")} />
+          <div className="handle r" onPointerDown={handle("r")} />
+        </>
+      )}
       {selected && <div className="resize" onPointerDown={onResizeDown} />}
     </div>
   );

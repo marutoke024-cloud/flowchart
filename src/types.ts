@@ -9,7 +9,7 @@ export type ShapeKind =
 
 export type BorderStyle = "solid" | "dashed" | "none";
 
-export type NodeKind = "node" | "frame" | "image";
+export type NodeKind = "node" | "frame" | "image" | "text";
 
 export type Side = "t" | "r" | "b" | "l";
 
@@ -43,8 +43,11 @@ export interface DiagramNode {
   detailsOpen?: boolean;
   /** Optional colored tag pinned to the top-right corner. */
   label?: NodeLabel;
-  /** Long-form description shown/edited in the left writing panel. */
+  /** Long-form description (rich HTML) shown/edited in the left writing panel. */
   description?: string;
+  /** Free text node styling. */
+  fontSize?: number;
+  bold?: boolean;
 }
 
 export interface DiagramEdge {

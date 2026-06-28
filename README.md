@@ -25,8 +25,14 @@ boxes are **colored by default** with switchable theme palettes.
   fall back to a clean elbow when the path is clear.
 - **Image boxes** — `+ Image` drops an image as its own box: connectable, labelable,
   resizable on both axes, with a magnifier (or double-click) to view it enlarged.
-- **Writing panel** — toggle a left-hand panel and select any box to write a long
-  description for it (e.g. select a "climax" box to draft that scene). Built for plotting.
+- **Writing panel** — toggle a left-hand panel and select any box to write a long,
+  **rich** description (bold, font size, color, **inline images**) — e.g. select a
+  "climax" box to draft that scene. Built for plotting.
+- **Free text** — `+ Text` drops editable text anywhere on the board (size / color / bold).
+- **Frames follow the theme**, and a frame's title/border accent is derived automatically
+  from its fill.
+- New boxes are placed in **empty space** so they don't land on existing ones, and
+  connectors **route around** obstacles to reach the exact anchor (no cutting through boxes).
 - Typeface is **Noto Sans** (with Noto Sans JP) everywhere you write.
 - **Colored by default** + **theme switching** — pick from *Sage, Vivid, Ocean, Sunset,
   Mono*. Switching a theme recolors the whole board consistently; each box keeps its

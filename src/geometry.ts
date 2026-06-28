@@ -229,7 +229,7 @@ export function routeAround(
   const d3 = DIRS[sideB];
   const e3 = { x: p3.x + d3.x * STUB, y: p3.y + d3.y * STUB };
 
-  const DET = 170;
+  const DET = 220;
   const minX = Math.min(e0.x, e3.x) - DET;
   const minY = Math.min(e0.y, e3.y) - DET;
   const maxX = Math.max(e0.x, e3.x) + DET;
@@ -345,7 +345,13 @@ export function routeEdge(
   others: Rect[],
 ): Point[] {
   const simple = orthoPoints(a, sideA, b, sideB);
-  const clearRects = others.map((r) => inflate(r, 4));
+  // Clear-check must include the two endpoints (slightly shrunk so the legit
+  // anchor stubs that touch their borders don't register as crossings). This
+  // catches the case where a far-side anchor makes the simple elbow cut
+  // straight through the target box.
+  const clearRects = others
+    .map((r) => inflate(r, 4))
+    .concat([inflate(nodeRect(a), -2), inflate(nodeRect(b), -2)]);
   if (pathClear(simple, clearRects)) return simple;
   const around = routeAround(a, sideA, b, sideB, others);
   return around ?? simple;

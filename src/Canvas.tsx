@@ -120,23 +120,33 @@ export default function Canvas() {
     const up = (ev: PointerEvent) => {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
-      const target = document.elementFromPoint(ev.clientX, ev.clientY)?.closest("[data-node-id]");
-      const toId = target?.getAttribute("data-node-id");
-      if (toId && toId !== fromId) {
-        const all = useStore.getState().nodes;
-        const node = all.find((n) => n.id === toId);
+      const all = useStore.getState().nodes;
+      const cur = useStore.getState().viewport;
+      const wp = screenToWorld(ev.clientX - r.left, ev.clientY - r.top, cur);
+      // Hit-test in world space so a connection lands on whatever box is under
+      // the pointer, regardless of overlapping edges/images/labels on top.
+      // A small slop lets a near-miss still connect. Pick the topmost match.
+      const slop = 10;
+      const hit = [...all]
+        .reverse()
+        .find(
+          (n) =>
+            n.id !== fromId &&
+            n.kind !== "frame" &&
+            n.kind !== "text" &&
+            wp.x >= n.x - slop &&
+            wp.x <= n.x + n.width + slop &&
+            wp.y >= n.y - slop &&
+            wp.y <= n.y + n.height + slop,
+        );
+      if (hit) {
         const src = all.find((n) => n.id === fromId);
-        const cur = useStore.getState().viewport;
-        const wp = screenToWorld(ev.clientX - r.left, ev.clientY - r.top, cur);
-        let toSide = node ? nearestSide(node, wp) : undefined;
-        // if dropped near the centre, attach to the side facing the source
-        if (node && src) {
-          const c = nodeCenter(node);
-          const nx = (wp.x - c.x) / (node.width / 2 || 1);
-          const ny = (wp.y - c.y) / (node.height / 2 || 1);
-          if (Math.hypot(nx, ny) < 0.45) toSide = nearestSide(node, nodeCenter(src));
-        }
-        addEdge(fromId, toId, fromSide, toSide);
+        let toSide = nearestSide(hit, wp);
+        const c = nodeCenter(hit);
+        const nx = (wp.x - c.x) / (hit.width / 2 || 1);
+        const ny = (wp.y - c.y) / (hit.height / 2 || 1);
+        if (src && Math.hypot(nx, ny) < 0.45) toSide = nearestSide(hit, nodeCenter(src));
+        addEdge(fromId, hit.id, fromSide, toSide);
       }
       setTempLink(null);
     };
