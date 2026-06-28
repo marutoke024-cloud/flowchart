@@ -1,15 +1,28 @@
 import { useEffect, useRef } from "react";
-import type { DiagramNode } from "./types";
+import type { DiagramNode, Side } from "./types";
 import { useStore } from "./store";
+import { bestTextColor } from "./utils";
 import EditableText from "./EditableText";
 import { IconChevron } from "./icons";
 
 interface Props {
   node: DiagramNode;
-  startLink: (id: string, clientX: number, clientY: number) => void;
+  startLink: (id: string, side: Side, clientX: number, clientY: number) => void;
 }
 
-const MIN_W = 96;
+const MIN_W = 110;
+
+/** Horizontal padding (as % of width) keeps text inside non-rectangular shapes. */
+function bodyPadding(shape: DiagramNode["shape"]): string {
+  switch (shape) {
+    case "diamond": return "16px 24%";
+    case "circle": return "14px 17%";
+    case "ellipse": return "12px 15%";
+    case "parallelogram": return "14px 19%";
+    case "hexagon": return "14px 13%";
+    default: return "14px 16px";
+  }
+}
 
 /** SVG background that draws the shape's fill + border for every shape kind. */
 function ShapeBg({ node }: { node: DiagramNode }) {
@@ -30,9 +43,19 @@ function ShapeBg({ node }: { node: DiagramNode }) {
     case "ellipse":
       el = <ellipse cx={w / 2} cy={h / 2} rx={w / 2 - inset} ry={h / 2 - inset} {...common} />;
       break;
+    case "circle": {
+      const r = Math.min(w, h) / 2 - inset;
+      el = <circle cx={w / 2} cy={h / 2} r={r} {...common} />;
+      break;
+    }
     case "diamond":
       el = <polygon points={`${w / 2},${inset} ${w - inset},${h / 2} ${w / 2},${h - inset} ${inset},${h / 2}`} {...common} />;
       break;
+    case "parallelogram": {
+      const o = Math.min(h * 0.5, w * 0.24, 40);
+      el = <polygon points={`${o},${inset} ${w - inset},${inset} ${w - o},${h - inset} ${inset},${h - inset}`} {...common} />;
+      break;
+    }
     case "hexagon": {
       const o = Math.min(w * 0.22, h * 0.5);
       el = <polygon points={`${o},${inset} ${w - o},${inset} ${w - inset},${h / 2} ${w - o},${h - inset} ${o},${h - inset} ${inset},${h / 2}`} {...common} />;
@@ -85,12 +108,10 @@ export default function Node({ node, startLink }: Props) {
     return () => ro.disconnect();
   }, [node.id, updateNode]);
 
-  const needsExtraPad = node.shape === "diamond" || node.shape === "ellipse";
-
   const onPointerDown = (e: React.PointerEvent) => {
     if (editing) return;
     const target = e.target as HTMLElement;
-    if (target.closest(".handle, .resize")) return;
+    if (target.closest(".handle, .resize, .node-label")) return;
     e.stopPropagation();
     select(node.id);
     const zoom = useStore.getState().viewport.zoom;
@@ -139,11 +160,12 @@ export default function Node({ node, startLink }: Props) {
     window.addEventListener("pointerup", up);
   };
 
-  const handle = (side: string) => (e: React.PointerEvent) => {
+  const handle = (side: Side) => (e: React.PointerEvent) => {
     e.stopPropagation();
-    startLink(node.id, e.clientX, e.clientY);
-    void side;
+    startLink(node.id, side, e.clientX, e.clientY);
   };
+
+  const labelRef = useRef<HTMLSpanElement>(null);
 
   return (
     <div
@@ -162,7 +184,7 @@ export default function Node({ node, startLink }: Props) {
       <div
         className="node-body"
         style={{
-          padding: needsExtraPad ? "10px 22px" : undefined,
+          padding: bodyPadding(node.shape),
           justifyContent: node.image || node.details ? "flex-start" : "center",
           color: node.textColor,
         }}
@@ -217,15 +239,36 @@ export default function Node({ node, startLink }: Props) {
         )}
       </div>
 
-      {selected && (
-        <>
-          <div className="handle t" onPointerDown={handle("t")} />
-          <div className="handle b" onPointerDown={handle("b")} />
-          <div className="handle l" onPointerDown={handle("l")} />
-          <div className="handle r" onPointerDown={handle("r")} />
-          <div className="resize" onPointerDown={onResizeDown} />
-        </>
+      {node.label && (
+        <div
+          className="node-label"
+          style={{ background: node.label.color, color: bestTextColor(node.label.color) }}
+        >
+          <span
+            ref={labelRef}
+            className="node-label-text"
+            contentEditable
+            suppressContentEditableWarning
+            data-placeholder="Label"
+            onPointerDown={(e) => e.stopPropagation()}
+            onFocus={commit}
+            onBlur={(e) =>
+              updateNode(node.id, {
+                label: { ...node.label!, text: e.currentTarget.textContent ?? "" },
+              })
+            }
+          >
+            {node.label.text}
+          </span>
+        </div>
       )}
+
+      {/* side anchors: hidden until hover/selected, used to draw connectors */}
+      <div className="handle t" onPointerDown={handle("t")} />
+      <div className="handle b" onPointerDown={handle("b")} />
+      <div className="handle l" onPointerDown={handle("l")} />
+      <div className="handle r" onPointerDown={handle("r")} />
+      {selected && <div className="resize" onPointerDown={onResizeDown} />}
     </div>
   );
 }

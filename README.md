@@ -13,7 +13,15 @@ boxes are **colored by default** with switchable theme palettes.
 - **Infinite canvas** — pan (drag the background or two‑finger drag), zoom (`Ctrl`/`⌘` +
   scroll, pinch, or the zoom bar). Works with mouse, trackpad, pen and touch via Pointer
   Events.
-- **Boxes** in five shapes: rounded, rectangle, diamond, ellipse, hexagon.
+- **Boxes** in seven shapes: rounded, rectangle, diamond, ellipse, circle, hexagon,
+  parallelogram. Box text is centered and the box auto-grows to fit (diamonds included);
+  collapsible notes stay left-aligned.
+- **Frames** — drop a large background container (like a FigJam section) to group boxes,
+  with an editable title.
+- **Corner labels** — pin a small colored, editable tag to a box's top-right corner.
+- **Smart connectors** — orthogonal / elbow routing with rounded corners that leave each
+  box perpendicular and snap to top/bottom/left/right anchor points; arrows follow the
+  active theme color.
 - **Colored by default** + **theme switching** — pick from *Sage, Vivid, Ocean, Sunset,
   Mono*. Switching a theme recolors the whole board consistently; each box keeps its
   color slot. Custom colors are preserved.
