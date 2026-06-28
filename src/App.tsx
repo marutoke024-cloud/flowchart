@@ -5,11 +5,19 @@ import PropertiesPanel from "./PropertiesPanel";
 import LeftPanel from "./LeftPanel";
 import ZoomBar from "./ZoomBar";
 import Lightbox from "./Lightbox";
+import Home from "./Home";
 import { useStore } from "./store";
 
 export default function App() {
+  const view = useStore((s) => s.view);
   const hasNodes = useStore((s) => s.nodes.length > 0);
   const panelOpen = useStore((s) => s.selectedId !== null || s.selectedEdgeId !== null);
+
+  // apply the themed board background to the page
+  const boardBg = useStore((s) => s.boardBg);
+  useEffect(() => {
+    document.documentElement.style.setProperty("--bg", boardBg);
+  }, [boardBg]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -46,6 +54,8 @@ export default function App() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  if (view === "home") return <Home />;
 
   return (
     <div className={`app ${panelOpen ? "panel-open" : ""}`}>

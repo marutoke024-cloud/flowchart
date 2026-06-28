@@ -3,6 +3,7 @@ import type { DiagramNode } from "./types";
 import { useStore } from "./store";
 import { bestTextColor } from "./utils";
 import EditableText from "./EditableText";
+import { IconResize } from "./icons";
 
 const MIN_W = 160;
 const MIN_H = 120;
@@ -101,7 +102,11 @@ export default function Frame({ node }: { node: DiagramNode }) {
           onCommit={commit}
         />
       </div>
-      {selected && <div className="resize" onPointerDown={onResize} />}
+      {selected && (
+        <div className="resize" onPointerDown={onResize}>
+          <IconResize />
+        </div>
+      )}
     </div>
   );
 }

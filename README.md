@@ -10,6 +10,19 @@ boxes are **colored by default** with switchable theme palettes.
 
 ## Features
 
+- **Home page** — a landing screen with an animated ring of geometric shapes and quick
+  actions: *Continue editing the latest diagram*, *Works*, *New Work*. The board opens
+  from here.
+- **Works (Save)** — save in-progress diagrams to a local library and reopen them later;
+  leaving to the home page with unsaved changes asks for confirmation.
+- **Export PNG** — fits the board to screen and exports it as a PNG image.
+- **Many theme palettes**, and picking a theme also tints the **board background** (the
+  palette's palest tone, lightened a touch).
+- **Resize boxes on both axes** (like frames); the resize handle is a transparent
+  diagonal mark, distinct from the round connection anchors.
+- **10 shapes** including Predefined Process, Database and Multiple Documents.
+
+
 - **Infinite canvas** — pan (drag the background or two‑finger drag), zoom (`Ctrl`/`⌘` +
   scroll, pinch, or the zoom bar). Works with mouse, trackpad, pen and touch via Pointer
   Events.

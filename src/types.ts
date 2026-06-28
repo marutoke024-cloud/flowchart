@@ -5,7 +5,10 @@ export type ShapeKind =
   | "ellipse"
   | "circle"
   | "hexagon"
-  | "parallelogram";
+  | "parallelogram"
+  | "predefined"
+  | "database"
+  | "multidoc";
 
 export type BorderStyle = "solid" | "dashed" | "none";
 
@@ -48,6 +51,8 @@ export interface DiagramNode {
   /** Free text node styling. */
   fontSize?: number;
   bold?: boolean;
+  /** When true the height is user-set (vertical resize), not content-driven. */
+  fixedH?: boolean;
 }
 
 export interface DiagramEdge {

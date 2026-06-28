@@ -27,6 +27,7 @@ export default function Canvas() {
   const setEditing = useStore((s) => s.setEditing);
   const addEdge = useStore((s) => s.addEdge);
 
+  const boardBg = useStore((s) => s.boardBg);
   const [panning, setPanning] = useState(false);
   const [tempLink, setTempLink] = useState<{ from: string; fromSide: Side; to: Point } | null>(null);
 
@@ -165,6 +166,7 @@ export default function Canvas() {
     <div
       ref={ref}
       className={`canvas ${panning ? "panning" : ""} ${tempLink ? "linking" : ""}`}
+      style={{ backgroundColor: boardBg }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={endPointer}

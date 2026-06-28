@@ -1,18 +1,20 @@
 import { useRef } from "react";
 import { useStore } from "./store";
-import { fitViewport, viewCenter, downloadJson, fileToDataUrl, emptySpot } from "./utils";
+import { toPng } from "html-to-image";
+import { fitViewport, viewCenter, fileToDataUrl, emptySpot } from "./utils";
 import {
   IconPlus,
   IconUndo,
   IconRedo,
   IconFit,
   IconExport,
-  IconImport,
   IconFrame,
   IconImage,
   IconSidebar,
   IconText,
+  IconSave,
 } from "./icons";
+import ThemeMenu from "./ThemeMenu";
 
 const NODE_W = 208;
 const NODE_H = 96;
@@ -24,8 +26,6 @@ function placement(w: number, h: number) {
   const boxes = useStore.getState().nodes.filter((n) => n.kind !== "frame");
   return emptySpot(boxes, c.x, c.y, w, h);
 }
-import type { DiagramEdge, DiagramNode } from "./types";
-import ThemeMenu from "./ThemeMenu";
 
 export default function Toolbar() {
   const addNode = useStore((s) => s.addNode);
@@ -37,11 +37,13 @@ export default function Toolbar() {
   const undo = useStore((s) => s.undo);
   const redo = useStore((s) => s.redo);
   const setViewport = useStore((s) => s.setViewport);
-  const loadDiagram = useStore((s) => s.loadDiagram);
+  const saveWork = useStore((s) => s.saveWork);
+  const setView = useStore((s) => s.setView);
+  const select = useStore((s) => s.select);
+  const dirty = useStore((s) => s.dirty);
   const canUndo = useStore((s) => s.past.length > 0);
   const canRedo = useStore((s) => s.future.length > 0);
 
-  const fileInput = useRef<HTMLInputElement>(null);
   const imageInput = useRef<HTMLInputElement>(null);
 
   const onAddImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -85,37 +87,54 @@ export default function Toolbar() {
     if (vp) setViewport(vp);
   };
 
-  const onExport = () => {
-    const { nodes, edges } = useStore.getState();
-    downloadJson({ version: 1, nodes, edges }, "flowmin-diagram.json");
+  const onExportPng = async () => {
+    const { nodes, boardBg } = useStore.getState();
+    if (nodes.length === 0) return;
+    select(null);
+    const vp = fitViewport(nodes, window.innerWidth, window.innerHeight);
+    if (vp) setViewport(vp);
+    // wait for the re-render/layout before capturing
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const el = document.querySelector(".canvas") as HTMLElement | null;
+    if (!el) return;
+    try {
+      const url = await toPng(el, {
+        backgroundColor: boardBg,
+        pixelRatio: 2,
+        cacheBust: true,
+        skipFonts: true, // avoid CORS error reading the Google Fonts stylesheet
+      });
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "flowmin-board.png";
+      a.click();
+    } catch {
+      alert("Could not export the image.");
+    }
   };
 
-  const onImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        const data = JSON.parse(reader.result as string) as {
-          nodes: DiagramNode[];
-          edges: DiagramEdge[];
-        };
-        if (Array.isArray(data.nodes) && Array.isArray(data.edges)) {
-          loadDiagram(data);
-          const vp = fitViewport(data.nodes, window.innerWidth, window.innerHeight);
-          if (vp) setViewport(vp);
-        }
-      } catch {
-        alert("Could not read that file.");
-      }
-    };
-    reader.readAsText(file);
-    e.target.value = "";
+  const onSave = () => {
+    const st = useStore.getState();
+    if (!st.currentWorkId) {
+      const name = window.prompt("Name this work", "Untitled");
+      if (name === null) return;
+      saveWork(name);
+    } else {
+      saveWork();
+    }
+  };
+
+  const onHome = () => {
+    if (useStore.getState().dirty) {
+      const ok = window.confirm("You have unsaved changes. Leave to the home page without saving?");
+      if (!ok) return;
+    }
+    setView("home");
   };
 
   return (
     <div className="toolbar">
-      <div className="brand">
+      <button className="brand" onClick={onHome} title="Home (back to top page)">
         <svg width="22" height="22" viewBox="0 0 100 100">
           <rect width="100" height="100" rx="22" fill="#222725" />
           <rect x="22" y="28" width="30" height="20" rx="5" fill="#f7f7f2" />
@@ -123,7 +142,7 @@ export default function Toolbar() {
           <path d="M37 48 L37 64 L52 64" stroke="#f7f7f2" strokeWidth="4" fill="none" />
         </svg>
         <span>FlowMin</span>
-      </div>
+      </button>
       <div className="divider" />
 
       <button className="tbtn primary" onClick={onAdd} title="Add box">
@@ -172,19 +191,14 @@ export default function Toolbar() {
       <button className="tbtn" onClick={onFit} title="Fit to screen">
         <IconFit />
       </button>
-      <button className="tbtn" onClick={onExport} title="Export JSON">
+      <button className="tbtn" onClick={onExportPng} title="Export board as PNG">
         <IconExport />
+        <span className="lbl">PNG</span>
       </button>
-      <button className="tbtn" onClick={() => fileInput.current?.click()} title="Import JSON">
-        <IconImport />
+      <button className={`tbtn primary ${dirty ? "" : "saved"}`} onClick={onSave} title="Save to Works">
+        <IconSave />
+        <span className="lbl">{dirty ? "Save" : "Saved"}</span>
       </button>
-      <input
-        ref={fileInput}
-        type="file"
-        accept="application/json"
-        style={{ display: "none" }}
-        onChange={onImportFile}
-      />
     </div>
   );
 }
