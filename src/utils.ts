@@ -66,6 +66,66 @@ export function bestTextColor(fill: string): string {
   return lum > 0.5 ? "#1A1C1A" : "#FBFBF7";
 }
 
+function parseHex(hex: string): [number, number, number] {
+  const h = hex.replace("#", "");
+  if (h.length < 6) return [128, 128, 128];
+  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+}
+function toHex(r: number, g: number, b: number): string {
+  const c = (n: number) => Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, "0");
+  return `#${c(r)}${c(g)}${c(b)}`;
+}
+
+/** Darken a colour toward black by factor f (0..1). */
+export function darken(hex: string, f = 0.6): string {
+  const [r, g, b] = parseHex(hex);
+  return toHex(r * f, g * f, b * f);
+}
+
+/** Lighten a colour toward white by amount t (0..1). */
+export function tint(hex: string, t = 0.85): string {
+  const [r, g, b] = parseHex(hex);
+  return toHex(r + (255 - r) * t, g + (255 - g) * t, b + (255 - b) * t);
+}
+
+/** A border/title accent derived from a frame fill. */
+export function frameAccent(fill: string): string {
+  return darken(fill, 0.55);
+}
+
+interface RectLike {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * Find a spot near (cx, cy) for a w×h box that doesn't overlap existing rects.
+ * Spirals outward until a free location is found.
+ */
+export function emptySpot(rects: RectLike[], cx: number, cy: number, w: number, h: number) {
+  const gap = 28;
+  const overlaps = (x: number, y: number) =>
+    rects.some(
+      (r) =>
+        Math.abs(x - (r.x + r.width / 2)) * 2 < w + r.width + gap &&
+        Math.abs(y - (r.y + r.height / 2)) * 2 < h + r.height + gap,
+    );
+  if (!overlaps(cx, cy)) return { x: cx, y: cy };
+  const step = 56;
+  for (let ring = 1; ring < 60; ring++) {
+    const rad = ring * step;
+    for (let a = 0; a < 12; a++) {
+      const ang = (a / 12) * Math.PI * 2;
+      const x = cx + Math.cos(ang) * rad;
+      const y = cy + Math.sin(ang) * rad;
+      if (!overlaps(x, y)) return { x, y };
+    }
+  }
+  return { x: cx, y: cy };
+}
+
 export function downloadJson(data: unknown, name: string) {
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);

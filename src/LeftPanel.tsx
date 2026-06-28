@@ -1,4 +1,5 @@
 import { useStore } from "./store";
+import RichText from "./RichText";
 
 /**
  * A toggleable writing panel on the left. When a box is selected you can write
@@ -27,13 +28,11 @@ export default function LeftPanel() {
       </div>
 
       {writable ? (
-        <textarea
+        <RichText
           key={node!.id}
-          className="leftpanel-text"
-          placeholder="Write the details for this box…"
           value={node!.description ?? ""}
-          onFocus={commit}
-          onChange={(e) => updateNode(node!.id, { description: e.target.value })}
+          onCommit={commit}
+          onChange={(html) => updateNode(node!.id, { description: html })}
         />
       ) : (
         <div className="leftpanel-empty">

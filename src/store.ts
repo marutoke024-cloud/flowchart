@@ -15,18 +15,53 @@ import {
   NODE_DEFAULTS,
   themeByName,
 } from "./theme";
-import { bestTextColor } from "./utils";
+import { bestTextColor, frameAccent, tint } from "./utils";
 import type { Side } from "./types";
 
 const STORAGE_KEY = "flowmin.diagram.v1";
+const WORKS_KEY = "flowmin.works.v1";
 const HISTORY_LIMIT = 60;
+
+export interface SavedWork {
+  id: string;
+  name: string;
+  updatedAt: number;
+  data: {
+    nodes: DiagramNode[];
+    edges: DiagramEdge[];
+    theme: string;
+    boardBg: string;
+    viewport: Viewport;
+  };
+}
+
+function loadWorks(): SavedWork[] {
+  try {
+    const raw = localStorage.getItem(WORKS_KEY);
+    return raw ? (JSON.parse(raw) as SavedWork[]) : [];
+  } catch {
+    return [];
+  }
+}
+function saveWorks(works: SavedWork[]) {
+  try {
+    localStorage.setItem(WORKS_KEY, JSON.stringify(works));
+  } catch {
+    /* storage full */
+  }
+}
 
 interface PersistShape {
   nodes: DiagramNode[];
   edges: DiagramEdge[];
   viewport: Viewport;
   theme?: string;
+  boardBg?: string;
   leftPanelOpen?: boolean;
+}
+
+function boardBgFor(theme: string): string {
+  return tint(themeByName(theme).colors[5], 0.4);
 }
 
 function loadPersisted(): PersistShape | null {
@@ -51,6 +86,7 @@ function persist(state: DiagramState) {
         edges: state.edges,
         viewport: state.viewport,
         theme: state.theme,
+        boardBg: state.boardBg,
         leftPanelOpen: state.leftPanelOpen,
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
@@ -69,7 +105,14 @@ export interface DiagramState {
   editingId: string | null;
   lightboxSrc: string | null;
   theme: string;
+  boardBg: string;
   leftPanelOpen: boolean;
+
+  // app shell + persistence to "Works"
+  view: "home" | "editor";
+  works: SavedWork[];
+  currentWorkId: string | null;
+  dirty: boolean;
 
   past: DiagramSnapshot[];
   future: DiagramSnapshot[];
@@ -92,10 +135,18 @@ export interface DiagramState {
   // ui
   toggleLeftPanel: () => void;
 
+  // app shell
+  setView: (v: "home" | "editor") => void;
+  saveWork: (name?: string) => void;
+  newWork: () => void;
+  loadWork: (id: string) => void;
+  deleteWork: (id: string) => void;
+
   // node ops
   addNode: (x: number, y: number, shape?: ShapeKind) => string;
   addFrame: (x: number, y: number) => string;
   addImageNode: (x: number, y: number, image: string, width: number, height: number) => string;
+  addText: (x: number, y: number) => string;
   updateNode: (id: string, patch: Partial<DiagramNode>) => void;
   removeNode: (id: string) => void;
 
@@ -125,7 +176,12 @@ export const useStore = create<DiagramState>((set, get) => ({
   edges: persisted?.edges ?? [],
   viewport: persisted?.viewport ?? { x: 0, y: 0, zoom: 1 },
   theme: persisted?.theme ?? DEFAULT_THEME,
+  boardBg: persisted?.boardBg ?? boardBgFor(persisted?.theme ?? DEFAULT_THEME),
   leftPanelOpen: persisted?.leftPanelOpen ?? false,
+  view: "home",
+  works: loadWorks(),
+  currentWorkId: null,
+  dirty: false,
   selectedId: null,
   selectedEdgeId: null,
   editingId: null,
@@ -136,7 +192,7 @@ export const useStore = create<DiagramState>((set, get) => ({
   commit: () => {
     const s = get();
     const past = [...s.past, snapshot(s)].slice(-HISTORY_LIMIT);
-    set({ past, future: [] });
+    set({ past, future: [], dirty: true });
   },
 
   select: (id) => set({ selectedId: id, selectedEdgeId: null }),
@@ -154,14 +210,89 @@ export const useStore = create<DiagramState>((set, get) => ({
     persist(get());
   },
 
+  setView: (v) => set({ view: v }),
+
+  saveWork: (name) => {
+    const s = get();
+    const data = {
+      nodes: s.nodes.map((n) => ({ ...n })),
+      edges: s.edges.map((e) => ({ ...e })),
+      theme: s.theme,
+      boardBg: s.boardBg,
+      viewport: s.viewport,
+    };
+    const now = Date.now();
+    let id = s.currentWorkId;
+    let works: SavedWork[];
+    if (id && s.works.some((w) => w.id === id)) {
+      works = s.works.map((w) => (w.id === id ? { ...w, name: name ?? w.name, updatedAt: now, data } : w));
+    } else {
+      id = nanoid(8);
+      works = [{ id, name: name?.trim() || `Untitled ${s.works.length + 1}`, updatedAt: now, data }, ...s.works];
+    }
+    saveWorks(works);
+    set({ works, currentWorkId: id, dirty: false });
+  },
+
+  newWork: () => {
+    set({
+      nodes: [],
+      edges: [],
+      selectedId: null,
+      selectedEdgeId: null,
+      editingId: null,
+      currentWorkId: null,
+      dirty: false,
+      view: "editor",
+      past: [],
+      future: [],
+      viewport: { x: 0, y: 0, zoom: 1 },
+    });
+    persist(get());
+  },
+
+  loadWork: (id) => {
+    const w = get().works.find((x) => x.id === id);
+    if (!w) return;
+    const d = w.data;
+    set({
+      nodes: d.nodes.map((n) => ({ ...n })),
+      edges: d.edges.map((e) => ({ ...e })),
+      theme: d.theme ?? get().theme,
+      boardBg: d.boardBg ?? boardBgFor(d.theme ?? get().theme),
+      viewport: d.viewport ?? { x: 0, y: 0, zoom: 1 },
+      currentWorkId: id,
+      dirty: false,
+      view: "editor",
+      selectedId: null,
+      selectedEdgeId: null,
+      editingId: null,
+      past: [],
+      future: [],
+    });
+    persist(get());
+  },
+
+  deleteWork: (id) => {
+    const works = get().works.filter((w) => w.id !== id);
+    saveWorks(works);
+    set((s) => ({ works, currentWorkId: s.currentWorkId === id ? null : s.currentWorkId }));
+  },
+
   setTheme: (name) => {
     get().commit();
     const palette = themeByName(name);
     set((s) => ({
       theme: name,
-      // recolour boxes that follow a theme slot; custom colours are left as-is
+      boardBg: boardBgFor(name),
+      // recolour boxes that follow a theme slot; frames get a tinted fill +
+      // matching accent; custom box colours are left as-is
       nodes: s.nodes.map((n) => {
-        if (n.kind === "frame" || n.colorKey === undefined) return n;
+        if (n.kind === "frame") {
+          const fill = tint(palette.colors[0], 0.86);
+          return { ...n, fill, borderColor: frameAccent(fill) };
+        }
+        if (n.colorKey === undefined) return n;
         const fill = palette.colors[n.colorKey] ?? n.fill;
         return { ...n, fill, textColor: bestTextColor(fill) };
       }),
@@ -218,7 +349,7 @@ export const useStore = create<DiagramState>((set, get) => ({
       text: "",
       fill: FRAME_DEFAULTS.fill,
       textColor: "#475569",
-      borderColor: FRAME_DEFAULTS.borderColor,
+      borderColor: frameAccent(FRAME_DEFAULTS.fill),
       borderWidth: 2,
       borderStyle: "solid",
       roundness: 16,
@@ -264,6 +395,37 @@ export const useStore = create<DiagramState>((set, get) => ({
     return id;
   },
 
+  addText: (x, y) => {
+    get().commit();
+    const id = nanoid(8);
+    const node: DiagramNode = {
+      id,
+      kind: "text",
+      x: Math.round(x - 90),
+      y: Math.round(y - 16),
+      width: 180,
+      height: 32,
+      shape: "rounded",
+      text: "",
+      fill: "transparent",
+      textColor: "#1b1d1a",
+      borderColor: "transparent",
+      borderWidth: 0,
+      borderStyle: "none",
+      roundness: 0,
+      fontSize: 18,
+      bold: false,
+    };
+    set((s) => ({
+      nodes: [...s.nodes, node],
+      selectedId: id,
+      selectedEdgeId: null,
+      editingId: id,
+    }));
+    persist(get());
+    return id;
+  },
+
   updateNode: (id, patch) => {
     set((s) => ({
       nodes: s.nodes.map((n) => (n.id === id ? { ...n, ...patch } : n)),
@@ -284,9 +446,10 @@ export const useStore = create<DiagramState>((set, get) => ({
 
   addEdge: (from, to, fromSide, toSide) => {
     if (from === to) return;
+    // only block an identical connector (same direction + same anchors);
+    // reverse direction or a different anchor pair is allowed
     const exists = get().edges.some(
-      (e) =>
-        (e.from === from && e.to === to) || (e.from === to && e.to === from),
+      (e) => e.from === from && e.to === to && e.fromSide === fromSide && e.toSide === toSide,
     );
     if (exists) return;
     get().commit();
@@ -329,6 +492,7 @@ export const useStore = create<DiagramState>((set, get) => ({
       nodes: previous.nodes.map((n) => ({ ...n })),
       edges: previous.edges.map((e) => ({ ...e })),
       editingId: null,
+      dirty: true,
     });
     persist(get());
   },
@@ -343,6 +507,7 @@ export const useStore = create<DiagramState>((set, get) => ({
       nodes: next.nodes.map((n) => ({ ...n })),
       edges: next.edges.map((e) => ({ ...e })),
       editingId: null,
+      dirty: true,
     });
     persist(get());
   },

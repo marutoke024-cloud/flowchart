@@ -26,6 +26,15 @@ export const IconImage = () => (
 export const IconTrash = () => (
   <svg viewBox="0 0 24 24" {...s}><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /></svg>
 );
+export const IconResize = () => (
+  <svg viewBox="0 0 24 24" width={16} height={16} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M20 10V4h-6M4 14v6h6M20 4l-7 7M11 13l-7 7" /></svg>
+);
+export const IconText = () => (
+  <svg viewBox="0 0 24 24" {...s}><path d="M5 5h14M12 5v14M9 19h6" /></svg>
+);
+export const IconSave = () => (
+  <svg viewBox="0 0 24 24" {...s}><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" /><path d="M17 21v-8H7v8M7 3v5h8" /></svg>
+);
 export const IconZoom = () => (
   <svg viewBox="0 0 24 24" {...s}><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3M11 8v6M8 11h6" /></svg>
 );
@@ -62,5 +71,11 @@ export function ShapeIcon({ kind }: { kind: ShapeKind }) {
       return <svg viewBox="0 0 24 24" width={20} height={20}><circle cx="12" cy="12" r="8.5" {...p} /></svg>;
     case "parallelogram":
       return <svg viewBox="0 0 24 24" width={20} height={20}><path d="M8 6h13l-5 12H3Z" {...p} /></svg>;
+    case "predefined":
+      return <svg viewBox="0 0 24 24" width={20} height={20}><rect x="3" y="6" width="18" height="12" {...p} /><path d="M7 6v12M17 6v12" {...p} /></svg>;
+    case "database":
+      return <svg viewBox="0 0 24 24" width={20} height={20}><ellipse cx="12" cy="6" rx="8" ry="3" {...p} /><path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6" {...p} /></svg>;
+    case "multidoc":
+      return <svg viewBox="0 0 24 24" width={20} height={20}><path d="M7 4h13v11H7zM4 7h13v11H4" {...p} /></svg>;
   }
 }

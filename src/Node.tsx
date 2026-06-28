@@ -3,7 +3,7 @@ import type { DiagramNode, Side } from "./types";
 import { useStore } from "./store";
 import { bestTextColor } from "./utils";
 import EditableText from "./EditableText";
-import { IconChevron, IconZoom } from "./icons";
+import { IconChevron, IconZoom, IconResize } from "./icons";
 
 interface Props {
   node: DiagramNode;
@@ -20,6 +20,9 @@ function bodyPadding(shape: DiagramNode["shape"]): string {
     case "ellipse": return "12px 15%";
     case "parallelogram": return "14px 19%";
     case "hexagon": return "14px 13%";
+    case "database": return "26px 18px 20px";
+    case "predefined": return "14px 24px";
+    case "multidoc": return "14px 20px 24px 14px";
     default: return "14px 16px";
   }
 }
@@ -61,6 +64,49 @@ function ShapeBg({ node }: { node: DiagramNode }) {
       el = <polygon points={`${o},${inset} ${w - o},${inset} ${w - inset},${h / 2} ${w - o},${h - inset} ${o},${h - inset} ${inset},${h / 2}`} {...common} />;
       break;
     }
+    case "predefined": {
+      const bar = Math.min(16, w * 0.12);
+      el = (
+        <g>
+          <rect x={inset} y={inset} width={w - inset * 2} height={h - inset * 2} {...common} />
+          <line x1={inset + bar} y1={inset} x2={inset + bar} y2={h - inset} stroke={stroke} strokeWidth={common.strokeWidth || 2} />
+          <line x1={w - inset - bar} y1={inset} x2={w - inset - bar} y2={h - inset} stroke={stroke} strokeWidth={common.strokeWidth || 2} />
+        </g>
+      );
+      break;
+    }
+    case "database": {
+      const rx = w / 2 - inset;
+      const ry = Math.min(h * 0.16, 16);
+      const cx = w / 2;
+      const top = inset + ry;
+      const bot = h - inset - ry;
+      const body = `M ${inset} ${top} L ${inset} ${bot} A ${rx} ${ry} 0 0 0 ${w - inset} ${bot} L ${w - inset} ${top} A ${rx} ${ry} 0 0 1 ${inset} ${top} Z`;
+      el = (
+        <g>
+          <path d={body} {...common} />
+          <ellipse cx={cx} cy={top} rx={rx} ry={ry} fill="none" stroke={stroke} strokeWidth={common.strokeWidth} strokeDasharray={dash} vectorEffect="non-scaling-stroke" />
+        </g>
+      );
+      break;
+    }
+    case "multidoc": {
+      const off = 6;
+      const amp = Math.min(12, h * 0.12);
+      const x0 = inset;
+      const x1 = w - inset - off * 2;
+      const docTop = inset + off * 2;
+      const docBot = h - inset;
+      const wave = `M ${x0} ${docTop} L ${x1} ${docTop} L ${x1} ${docBot - amp} C ${x1 - (x1 - x0) * 0.25} ${docBot + amp} ${x0 + (x1 - x0) * 0.25} ${docBot - amp * 2} ${x0} ${docBot - amp} Z`;
+      el = (
+        <g>
+          <rect x={inset + off * 2} y={inset} width={w - inset * 2 - off * 2} height={h - inset * 2 - off * 2} {...common} />
+          <rect x={inset + off} y={inset + off} width={w - inset * 2 - off * 2} height={h - inset * 2 - off * 2} {...common} />
+          <path d={wave} {...common} />
+        </g>
+      );
+      break;
+    }
     case "rect":
       el = <rect x={inset} y={inset} width={w - inset * 2} height={h - inset * 2} {...common} />;
       break;
@@ -94,12 +140,13 @@ export default function Node({ node, startLink }: Props) {
   const dragState = useRef<{ sx: number; sy: number; ox: number; oy: number; moved: boolean } | null>(null);
   const elRef = useRef<HTMLDivElement>(null);
   const isImage = node.kind === "image";
+  const isText = node.kind === "text";
 
   // Height follows content (text wrap, image, notes); width is user-controlled.
   // Measured height is written back so the shape background and edges stay in sync.
   // Image boxes are sized directly by the user, so they opt out.
   useEffect(() => {
-    if (isImage) return;
+    if (isImage || node.fixedH) return;
     const el = elRef.current;
     if (!el) return;
     const ro = new ResizeObserver(() => {
@@ -109,7 +156,7 @@ export default function Node({ node, startLink }: Props) {
     });
     ro.observe(el);
     return () => ro.disconnect();
-  }, [node.id, updateNode, isImage]);
+  }, [node.id, updateNode, isImage, node.fixedH]);
 
   const onPointerDown = (e: React.PointerEvent) => {
     if (editing) return;
@@ -146,18 +193,26 @@ export default function Node({ node, startLink }: Props) {
     const zoom = useStore.getState().viewport.zoom;
     const start = { sx: e.clientX, sy: e.clientY, w: node.width, h: node.height };
     let committed = false;
+    let vertical = node.fixedH ?? false;
     const move = (ev: PointerEvent) => {
       if (!committed) {
         committed = true;
         commit();
       }
       const w = Math.max(MIN_W, Math.round(start.w + (ev.clientX - start.sx) / zoom));
+      const dy = (ev.clientY - start.sy) / zoom;
       if (isImage) {
-        // image boxes resize on both axes
-        const h = Math.max(60, Math.round(start.h + (ev.clientY - start.sy) / zoom));
+        const h = Math.max(60, Math.round(start.h + dy));
         updateNode(node.id, { width: w, height: h });
+        return;
+      }
+      // boxes/text: drag down to set an explicit height (like a frame); a pure
+      // horizontal drag keeps the height content-driven.
+      if (!vertical && Math.abs(dy) > 4) vertical = true;
+      if (vertical) {
+        const h = Math.max(48, Math.round(start.h + dy));
+        updateNode(node.id, { width: w, height: h, fixedH: true });
       } else {
-        // width only — height is driven by content
         updateNode(node.id, { width: w });
       }
     };
@@ -179,9 +234,9 @@ export default function Node({ node, startLink }: Props) {
   return (
     <div
       ref={elRef}
-      className={`node node-${node.shape} ${isImage ? "node-imagebox" : ""} ${selected ? "selected" : ""}`}
+      className={`node node-${node.shape} ${isImage ? "node-imagebox" : ""} ${isText ? "node-textbox" : ""} ${selected ? "selected" : ""}`}
       data-node-id={node.id}
-      style={{ left: node.x, top: node.y, width: node.width, ...(isImage ? { height: node.height } : {}) }}
+      style={{ left: node.x, top: node.y, width: node.width, ...(isImage || node.fixedH ? { height: node.height } : {}) }}
       onPointerDown={onPointerDown}
       onDoubleClick={(e) => {
         e.stopPropagation();
@@ -189,7 +244,25 @@ export default function Node({ node, startLink }: Props) {
         else setEditing(node.id);
       }}
     >
-      {isImage ? (
+      {isText ? (
+        <div
+          className="node-freetext"
+          style={{
+            fontSize: node.fontSize ?? 18,
+            color: node.textColor,
+            fontWeight: node.bold ? 700 : 500,
+          }}
+        >
+          <EditableText
+            className="node-freetext-edit"
+            value={node.text}
+            editing={editing}
+            placeholder="Text…"
+            onChange={(v) => updateNode(node.id, { text: v })}
+            onCommit={commit}
+          />
+        </div>
+      ) : isImage ? (
         <>
           <img
             className="node-fill-image"
@@ -220,6 +293,7 @@ export default function Node({ node, startLink }: Props) {
               padding: bodyPadding(node.shape),
               justifyContent: node.image || node.details ? "flex-start" : "center",
               color: node.textColor,
+              ...(node.fixedH ? { overflow: "hidden" } : {}),
             }}
           >
             <EditableText
@@ -299,11 +373,19 @@ export default function Node({ node, startLink }: Props) {
       )}
 
       {/* side anchors: hidden until hover/selected, used to draw connectors */}
-      <div className="handle t" onPointerDown={handle("t")} />
-      <div className="handle b" onPointerDown={handle("b")} />
-      <div className="handle l" onPointerDown={handle("l")} />
-      <div className="handle r" onPointerDown={handle("r")} />
-      {selected && <div className="resize" onPointerDown={onResizeDown} />}
+      {!isText && (
+        <>
+          <div className="handle t" onPointerDown={handle("t")} />
+          <div className="handle b" onPointerDown={handle("b")} />
+          <div className="handle l" onPointerDown={handle("l")} />
+          <div className="handle r" onPointerDown={handle("r")} />
+        </>
+      )}
+      {selected && (
+        <div className="resize" onPointerDown={onResizeDown}>
+          <IconResize />
+        </div>
+      )}
     </div>
   );
 }
