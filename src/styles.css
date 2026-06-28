@@ -17,7 +17,17 @@
   --radius: 14px;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
-  font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font: "Noto Sans", "Noto Sans JP", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: var(--font);
+}
+
+body,
+button,
+input,
+textarea,
+select,
+[contenteditable] {
+  font-family: var(--font);
 }
 
 * {
@@ -274,6 +284,97 @@ button {
 .frame-title-text {
   outline: none;
   white-space: nowrap;
+}
+
+/* ---------------- Image box ---------------- */
+.node-imagebox {
+  min-height: 0;
+}
+.node-fill-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+  box-shadow: var(--shadow-sm);
+}
+.node-zoom {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 3;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: none;
+  background: rgba(15, 23, 42, 0.55);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.node-imagebox:hover .node-zoom,
+.node-imagebox.selected .node-zoom {
+  opacity: 1;
+}
+
+/* ---------------- Left writing panel ---------------- */
+.leftpanel {
+  position: absolute;
+  top: calc(72px + var(--safe-top));
+  left: 12px;
+  bottom: calc(14px + var(--safe-bottom));
+  width: 308px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  z-index: 15;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.leftpanel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--panel-border);
+}
+.leftpanel-title {
+  font-weight: 700;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.leftpanel-close {
+  border: none;
+  background: none;
+  font-size: 22px;
+  line-height: 1;
+  color: var(--muted);
+}
+.leftpanel-text {
+  flex: 1;
+  resize: none;
+  border: none;
+  outline: none;
+  padding: 14px;
+  font-size: 14px;
+  line-height: 1.75;
+  background: transparent;
+  color: var(--text);
+}
+.leftpanel-empty {
+  padding: 22px 16px;
+  color: var(--muted);
+  font-size: 13.5px;
+  line-height: 1.7;
 }
 
 /* ---------------- Toolbar ---------------- */
@@ -595,6 +696,13 @@ button {
     left: 8px;
     right: 8px;
     width: auto;
+  }
+  .leftpanel {
+    left: 8px;
+    right: 8px;
+    width: auto;
+    bottom: auto;
+    height: 46vh;
   }
   .panel {
     top: auto;

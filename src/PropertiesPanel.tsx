@@ -360,11 +360,103 @@ function EdgePanel({ id }: { id: string }) {
   );
 }
 
+function ImagePanel({ id }: { id: string }) {
+  const node = useStore((s) => s.nodes.find((n) => n.id === id));
+  const updateNode = useStore((s) => s.updateNode);
+  const removeNode = useStore((s) => s.removeNode);
+  const commit = useStore((s) => s.commit);
+  const fileInput = useRef<HTMLInputElement>(null);
+  if (!node) return null;
+
+  const onReplace = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const url = await fileToDataUrl(file);
+      commit();
+      updateNode(id, { image: url });
+    } catch {
+      alert("Could not load that image.");
+    }
+    e.target.value = "";
+  };
+
+  return (
+    <div className="panel">
+      <div>
+        <h4>Image</h4>
+        <input
+          ref={fileInput}
+          type="file"
+          accept="image/*"
+          style={{ display: "none" }}
+          onChange={onReplace}
+        />
+        <button className="panel-btn" onClick={() => fileInput.current?.click()}>
+          <IconImage />
+          Replace image
+        </button>
+      </div>
+
+      <div>
+        <h4>Corner label</h4>
+        {node.label === undefined ? (
+          <button
+            className="panel-btn"
+            onClick={() => {
+              commit();
+              updateNode(id, { label: { text: "Label", color: LABEL_COLORS[0] } });
+            }}
+          >
+            <IconTag />
+            Add label
+          </button>
+        ) : (
+          <>
+            <div className="swatches">
+              {LABEL_COLORS.map((c) => (
+                <button
+                  key={c}
+                  className={`swatch ${node.label!.color === c ? "active" : ""}`}
+                  style={{ background: c }}
+                  onClick={() => {
+                    commit();
+                    updateNode(id, { label: { ...node.label!, color: c } });
+                  }}
+                />
+              ))}
+            </div>
+            <button
+              className="panel-btn"
+              style={{ marginTop: 8 }}
+              onClick={() => {
+                commit();
+                updateNode(id, { label: undefined });
+              }}
+            >
+              Remove label
+            </button>
+          </>
+        )}
+      </div>
+
+      <button className="panel-btn danger" onClick={() => removeNode(id)}>
+        <IconTrash />
+        Delete image
+      </button>
+    </div>
+  );
+}
+
 export default function PropertiesPanel() {
   const selectedId = useStore((s) => s.selectedId);
   const selectedEdgeId = useStore((s) => s.selectedEdgeId);
   const selectedKind = useStore((s) => s.nodes.find((n) => n.id === s.selectedId)?.kind);
-  if (selectedId) return selectedKind === "frame" ? <FramePanel id={selectedId} /> : <NodePanel id={selectedId} />;
+  if (selectedId) {
+    if (selectedKind === "frame") return <FramePanel id={selectedId} />;
+    if (selectedKind === "image") return <ImagePanel id={selectedId} />;
+    return <NodePanel id={selectedId} />;
+  }
   if (selectedEdgeId) return <EdgePanel id={selectedEdgeId} />;
   return null;
 }

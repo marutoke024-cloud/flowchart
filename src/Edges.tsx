@@ -1,10 +1,11 @@
 import { useStore } from "./store";
 import {
   chooseSides,
-  orthoPoints,
+  nodeRect,
   orthoToPoint,
   polylineMidpoint,
   roundedPath,
+  routeEdge,
 } from "./geometry";
 import type { Point } from "./geometry";
 import type { Side } from "./types";
@@ -20,6 +21,8 @@ export default function Edges({ tempLink }: Props) {
   const selectEdge = useStore((s) => s.selectEdge);
 
   const byId = new Map(nodes.map((n) => [n.id, n]));
+  // obstacles for routing: regular boxes only (not frames)
+  const boxes = nodes.filter((n) => n.kind !== "frame");
 
   return (
     <svg className="edge-layer" width={1} height={1}>
@@ -37,7 +40,8 @@ export default function Edges({ tempLink }: Props) {
         const b = byId.get(e.to);
         if (!a || !b) return null;
         const [autoA, autoB] = chooseSides(a, b);
-        const pts = orthoPoints(a, e.fromSide ?? autoA, b, e.toSide ?? autoB);
+        const others = boxes.filter((n) => n.id !== a.id && n.id !== b.id).map(nodeRect);
+        const pts = routeEdge(a, e.fromSide ?? autoA, b, e.toSide ?? autoB, others);
         const d = roundedPath(pts);
         const sel = selectedEdgeId === e.id;
         const stroke = sel ? "#4f46e5" : e.color;

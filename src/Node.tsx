@@ -3,7 +3,7 @@ import type { DiagramNode, Side } from "./types";
 import { useStore } from "./store";
 import { bestTextColor } from "./utils";
 import EditableText from "./EditableText";
-import { IconChevron } from "./icons";
+import { IconChevron, IconZoom } from "./icons";
 
 interface Props {
   node: DiagramNode;
@@ -93,10 +93,13 @@ export default function Node({ node, startLink }: Props) {
 
   const dragState = useRef<{ sx: number; sy: number; ox: number; oy: number; moved: boolean } | null>(null);
   const elRef = useRef<HTMLDivElement>(null);
+  const isImage = node.kind === "image";
 
   // Height follows content (text wrap, image, notes); width is user-controlled.
   // Measured height is written back so the shape background and edges stay in sync.
+  // Image boxes are sized directly by the user, so they opt out.
   useEffect(() => {
+    if (isImage) return;
     const el = elRef.current;
     if (!el) return;
     const ro = new ResizeObserver(() => {
@@ -106,7 +109,7 @@ export default function Node({ node, startLink }: Props) {
     });
     ro.observe(el);
     return () => ro.disconnect();
-  }, [node.id, updateNode]);
+  }, [node.id, updateNode, isImage]);
 
   const onPointerDown = (e: React.PointerEvent) => {
     if (editing) return;
@@ -141,16 +144,22 @@ export default function Node({ node, startLink }: Props) {
   const onResizeDown = (e: React.PointerEvent) => {
     e.stopPropagation();
     const zoom = useStore.getState().viewport.zoom;
-    const start = { sx: e.clientX, w: node.width };
+    const start = { sx: e.clientX, sy: e.clientY, w: node.width, h: node.height };
     let committed = false;
     const move = (ev: PointerEvent) => {
       if (!committed) {
         committed = true;
         commit();
       }
-      // width only — height is driven by content
       const w = Math.max(MIN_W, Math.round(start.w + (ev.clientX - start.sx) / zoom));
-      updateNode(node.id, { width: w });
+      if (isImage) {
+        // image boxes resize on both axes
+        const h = Math.max(60, Math.round(start.h + (ev.clientY - start.sy) / zoom));
+        updateNode(node.id, { width: w, height: h });
+      } else {
+        // width only — height is driven by content
+        updateNode(node.id, { width: w });
+      }
     };
     const up = () => {
       window.removeEventListener("pointermove", move);
@@ -170,74 +179,100 @@ export default function Node({ node, startLink }: Props) {
   return (
     <div
       ref={elRef}
-      className={`node node-${node.shape} ${selected ? "selected" : ""}`}
+      className={`node node-${node.shape} ${isImage ? "node-imagebox" : ""} ${selected ? "selected" : ""}`}
       data-node-id={node.id}
-      style={{ left: node.x, top: node.y, width: node.width }}
+      style={{ left: node.x, top: node.y, width: node.width, ...(isImage ? { height: node.height } : {}) }}
       onPointerDown={onPointerDown}
       onDoubleClick={(e) => {
         e.stopPropagation();
-        setEditing(node.id);
+        if (isImage) openLightbox(node.image!);
+        else setEditing(node.id);
       }}
     >
-      <ShapeBg node={node} />
-
-      <div
-        className="node-body"
-        style={{
-          padding: bodyPadding(node.shape),
-          justifyContent: node.image || node.details ? "flex-start" : "center",
-          color: node.textColor,
-        }}
-      >
-        <EditableText
-          className="node-text"
-          value={node.text}
-          editing={editing}
-          placeholder="Type…"
-          onChange={(v) => updateNode(node.id, { text: v })}
-          onCommit={commit}
-        />
-
-        {node.image && (
+      {isImage ? (
+        <>
           <img
-            className="node-image"
+            className="node-fill-image"
             src={node.image}
             alt=""
             draggable={false}
+            style={{ borderRadius: node.roundness }}
+          />
+          <button
+            className="node-zoom"
+            title="Enlarge"
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();
               openLightbox(node.image!);
             }}
-          />
-        )}
+          >
+            <IconZoom />
+          </button>
+        </>
+      ) : (
+        <>
+          <ShapeBg node={node} />
 
-        {node.details !== undefined && (
-          <div className="node-details">
-            <button
-              className={`node-details-toggle ${node.detailsOpen ? "open" : ""}`}
-              onPointerDown={(e) => e.stopPropagation()}
-              onClick={(e) => {
-                e.stopPropagation();
-                updateNode(node.id, { detailsOpen: !node.detailsOpen });
-              }}
-            >
-              <span className="chev"><IconChevron /></span>
-              {node.detailsOpen ? "Hide details" : "Show details"}
-            </button>
-            {node.detailsOpen && (
-              <EditableText
-                className="node-details-text"
-                value={node.details}
-                editing={editing}
-                placeholder="Add longer notes…"
-                onChange={(v) => updateNode(node.id, { details: v })}
-                onCommit={commit}
+          <div
+            className="node-body"
+            style={{
+              padding: bodyPadding(node.shape),
+              justifyContent: node.image || node.details ? "flex-start" : "center",
+              color: node.textColor,
+            }}
+          >
+            <EditableText
+              className="node-text"
+              value={node.text}
+              editing={editing}
+              placeholder="Type…"
+              onChange={(v) => updateNode(node.id, { text: v })}
+              onCommit={commit}
+            />
+
+            {node.image && (
+              <img
+                className="node-image"
+                src={node.image}
+                alt=""
+                draggable={false}
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openLightbox(node.image!);
+                }}
               />
             )}
+
+            {node.details !== undefined && (
+              <div className="node-details">
+                <button
+                  className={`node-details-toggle ${node.detailsOpen ? "open" : ""}`}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    updateNode(node.id, { detailsOpen: !node.detailsOpen });
+                  }}
+                >
+                  <span className="chev"><IconChevron /></span>
+                  {node.detailsOpen ? "Hide details" : "Show details"}
+                </button>
+                {node.detailsOpen && (
+                  <EditableText
+                    className="node-details-text"
+                    value={node.details}
+                    editing={editing}
+                    placeholder="Add longer notes…"
+                    onChange={(v) => updateNode(node.id, { details: v })}
+                    onCommit={commit}
+                  />
+                )}
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        </>
+      )}
 
       {node.label && (
         <div

@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import Canvas from "./Canvas";
 import Toolbar from "./Toolbar";
 import PropertiesPanel from "./PropertiesPanel";
+import LeftPanel from "./LeftPanel";
 import ZoomBar from "./ZoomBar";
 import Lightbox from "./Lightbox";
 import { useStore } from "./store";
@@ -57,6 +58,7 @@ export default function App() {
         </div>
       )}
       <Toolbar />
+      <LeftPanel />
       <PropertiesPanel />
       <ZoomBar />
       <Lightbox />

@@ -21,7 +21,13 @@ boxes are **colored by default** with switchable theme palettes.
 - **Corner labels** — pin a small colored, editable tag to a box's top-right corner.
 - **Smart connectors** — orthogonal / elbow routing with rounded corners that leave each
   box perpendicular and snap to top/bottom/left/right anchor points; arrows follow the
-  active theme color.
+  active theme color. Connectors **route around** boxes in the way (A\* pathfinding) and
+  fall back to a clean elbow when the path is clear.
+- **Image boxes** — `+ Image` drops an image as its own box: connectable, labelable,
+  resizable on both axes, with a magnifier (or double-click) to view it enlarged.
+- **Writing panel** — toggle a left-hand panel and select any box to write a long
+  description for it (e.g. select a "climax" box to draft that scene). Built for plotting.
+- Typeface is **Noto Sans** (with Noto Sans JP) everywhere you write.
 - **Colored by default** + **theme switching** — pick from *Sage, Vivid, Ocean, Sunset,
   Mono*. Switching a theme recolors the whole board consistently; each box keeps its
   color slot. Custom colors are preserved.
