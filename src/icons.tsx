@@ -26,6 +26,12 @@ export const IconImage = () => (
 export const IconTrash = () => (
   <svg viewBox="0 0 24 24" {...s}><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /></svg>
 );
+export const IconZoom = () => (
+  <svg viewBox="0 0 24 24" {...s}><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3M11 8v6M8 11h6" /></svg>
+);
+export const IconSidebar = () => (
+  <svg viewBox="0 0 24 24" {...s}><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M9 4v16" /></svg>
+);
 export const IconFrame = () => (
   <svg viewBox="0 0 24 24" {...s}><path d="M4 8h16M4 16h16M8 4v16M16 4v16" /><rect x="3" y="3" width="18" height="18" rx="2" /></svg>
 );

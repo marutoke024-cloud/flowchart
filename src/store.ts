@@ -26,6 +26,7 @@ interface PersistShape {
   edges: DiagramEdge[];
   viewport: Viewport;
   theme?: string;
+  leftPanelOpen?: boolean;
 }
 
 function loadPersisted(): PersistShape | null {
@@ -50,6 +51,7 @@ function persist(state: DiagramState) {
         edges: state.edges,
         viewport: state.viewport,
         theme: state.theme,
+        leftPanelOpen: state.leftPanelOpen,
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
     } catch {
@@ -67,6 +69,7 @@ export interface DiagramState {
   editingId: string | null;
   lightboxSrc: string | null;
   theme: string;
+  leftPanelOpen: boolean;
 
   past: DiagramSnapshot[];
   future: DiagramSnapshot[];
@@ -86,9 +89,13 @@ export interface DiagramState {
   // theme
   setTheme: (name: string) => void;
 
+  // ui
+  toggleLeftPanel: () => void;
+
   // node ops
   addNode: (x: number, y: number, shape?: ShapeKind) => string;
   addFrame: (x: number, y: number) => string;
+  addImageNode: (x: number, y: number, image: string, width: number, height: number) => string;
   updateNode: (id: string, patch: Partial<DiagramNode>) => void;
   removeNode: (id: string) => void;
 
@@ -118,6 +125,7 @@ export const useStore = create<DiagramState>((set, get) => ({
   edges: persisted?.edges ?? [],
   viewport: persisted?.viewport ?? { x: 0, y: 0, zoom: 1 },
   theme: persisted?.theme ?? DEFAULT_THEME,
+  leftPanelOpen: persisted?.leftPanelOpen ?? false,
   selectedId: null,
   selectedEdgeId: null,
   editingId: null,
@@ -138,6 +146,11 @@ export const useStore = create<DiagramState>((set, get) => ({
 
   setViewport: (vp) => {
     set({ viewport: vp });
+    persist(get());
+  },
+
+  toggleLeftPanel: () => {
+    set((s) => ({ leftPanelOpen: !s.leftPanelOpen }));
     persist(get());
   },
 
@@ -213,6 +226,36 @@ export const useStore = create<DiagramState>((set, get) => ({
     // frames go to the back so regular nodes render on top
     set((s) => ({
       nodes: [frame, ...s.nodes],
+      selectedId: id,
+      selectedEdgeId: null,
+      editingId: null,
+    }));
+    persist(get());
+    return id;
+  },
+
+  addImageNode: (x, y, image, width, height) => {
+    get().commit();
+    const id = nanoid(8);
+    const node: DiagramNode = {
+      id,
+      kind: "image",
+      x: Math.round(x - width / 2),
+      y: Math.round(y - height / 2),
+      width,
+      height,
+      shape: "rounded",
+      text: "",
+      fill: "#ffffff",
+      textColor: "#0f172a",
+      borderColor: "#cbd5e1",
+      borderWidth: 0,
+      borderStyle: "none",
+      roundness: 12,
+      image,
+    };
+    set((s) => ({
+      nodes: [...s.nodes, node],
       selectedId: id,
       selectedEdgeId: null,
       editingId: null,

@@ -1,6 +1,6 @@
 import { useRef } from "react";
 import { useStore } from "./store";
-import { fitViewport, viewCenter, downloadJson } from "./utils";
+import { fitViewport, viewCenter, downloadJson, fileToDataUrl } from "./utils";
 import {
   IconPlus,
   IconUndo,
@@ -9,6 +9,8 @@ import {
   IconExport,
   IconImport,
   IconFrame,
+  IconImage,
+  IconSidebar,
 } from "./icons";
 import type { DiagramEdge, DiagramNode } from "./types";
 import ThemeMenu from "./ThemeMenu";
@@ -16,6 +18,9 @@ import ThemeMenu from "./ThemeMenu";
 export default function Toolbar() {
   const addNode = useStore((s) => s.addNode);
   const addFrame = useStore((s) => s.addFrame);
+  const addImageNode = useStore((s) => s.addImageNode);
+  const toggleLeftPanel = useStore((s) => s.toggleLeftPanel);
+  const leftPanelOpen = useStore((s) => s.leftPanelOpen);
   const undo = useStore((s) => s.undo);
   const redo = useStore((s) => s.redo);
   const setViewport = useStore((s) => s.setViewport);
@@ -24,6 +29,29 @@ export default function Toolbar() {
   const canRedo = useStore((s) => s.future.length > 0);
 
   const fileInput = useRef<HTMLInputElement>(null);
+  const imageInput = useRef<HTMLInputElement>(null);
+
+  const onAddImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const url = await fileToDataUrl(file);
+      const img = new Image();
+      img.onload = () => {
+        const max = 260;
+        const scale = Math.min(1, max / Math.max(img.width, img.height));
+        const w = Math.max(80, Math.round(img.width * scale));
+        const h = Math.max(60, Math.round(img.height * scale));
+        const vp = useStore.getState().viewport;
+        const c = viewCenter(vp, window.innerWidth, window.innerHeight);
+        addImageNode(c.x, c.y, url, w, h);
+      };
+      img.src = url;
+    } catch {
+      alert("Could not load that image.");
+    }
+    e.target.value = "";
+  };
 
   const onAdd = () => {
     const vp = useStore.getState().viewport;
@@ -90,6 +118,25 @@ export default function Toolbar() {
       <button className="tbtn" onClick={onAddFrame} title="Add frame (group container)">
         <IconFrame />
         <span className="lbl">Frame</span>
+      </button>
+      <button className="tbtn" onClick={() => imageInput.current?.click()} title="Add image box">
+        <IconImage />
+        <span className="lbl">Image</span>
+      </button>
+      <input
+        ref={imageInput}
+        type="file"
+        accept="image/*"
+        style={{ display: "none" }}
+        onChange={onAddImage}
+      />
+      <button
+        className={`tbtn ${leftPanelOpen ? "active" : ""}`}
+        onClick={toggleLeftPanel}
+        title="Toggle writing panel"
+      >
+        <IconSidebar />
+        <span className="lbl">Notes</span>
       </button>
 
       <button className="tbtn" onClick={undo} disabled={!canUndo} title="Undo (⌘Z)">

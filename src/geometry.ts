@@ -151,6 +151,206 @@ export function polylineMidpoint(pts: Point[]): Point {
   return pts[pts.length - 1];
 }
 
+// ---------------------------------------------------------------------------
+// Obstacle-avoiding routing (A* on a coarse grid, with a cheap straight-path
+// fast path). Used to route connectors around boxes that sit between them.
+// ---------------------------------------------------------------------------
+
+export interface Rect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+export function nodeRect(n: DiagramNode): Rect {
+  return { x: n.x, y: n.y, w: n.width, h: n.height };
+}
+
+function inflate(r: Rect, m: number): Rect {
+  return { x: r.x - m, y: r.y - m, w: r.w + m * 2, h: r.h + m * 2 };
+}
+
+/** Does an axis-aligned segment intersect a rectangle? */
+function segHitsRect(a: Point, b: Point, r: Rect): boolean {
+  const minx = Math.min(a.x, b.x);
+  const maxx = Math.max(a.x, b.x);
+  const miny = Math.min(a.y, b.y);
+  const maxy = Math.max(a.y, b.y);
+  return maxx > r.x && minx < r.x + r.w && maxy > r.y && miny < r.y + r.h;
+}
+
+export function pathClear(pts: Point[], rects: Rect[]): boolean {
+  for (let i = 0; i < pts.length - 1; i++) {
+    for (const r of rects) {
+      if (segHitsRect(pts[i], pts[i + 1], r)) return false;
+    }
+  }
+  return true;
+}
+
+const STUB = 26;
+
+/** Collapse consecutive collinear / duplicate points. */
+function simplify(pts: Point[]): Point[] {
+  const out = dedupe(pts);
+  const res: Point[] = [];
+  for (let i = 0; i < out.length; i++) {
+    if (i === 0 || i === out.length - 1) {
+      res.push(out[i]);
+      continue;
+    }
+    const a = out[i - 1];
+    const b = out[i];
+    const c = out[i + 1];
+    const collinear =
+      (Math.abs(a.x - b.x) < 0.5 && Math.abs(b.x - c.x) < 0.5) ||
+      (Math.abs(a.y - b.y) < 0.5 && Math.abs(b.y - c.y) < 0.5);
+    if (!collinear) res.push(b);
+  }
+  return res;
+}
+
+/**
+ * Route from one node side to another, going around obstacle rectangles.
+ * Returns null if no route is found within the search region.
+ */
+export function routeAround(
+  a: DiagramNode,
+  sideA: Side,
+  b: DiagramNode,
+  sideB: Side,
+  obstacles: Rect[],
+): Point[] | null {
+  const p0 = sidePoint(a, sideA);
+  const d0 = DIRS[sideA];
+  const e0 = { x: p0.x + d0.x * STUB, y: p0.y + d0.y * STUB };
+  const p3 = sidePoint(b, sideB);
+  const d3 = DIRS[sideB];
+  const e3 = { x: p3.x + d3.x * STUB, y: p3.y + d3.y * STUB };
+
+  const DET = 170;
+  const minX = Math.min(e0.x, e3.x) - DET;
+  const minY = Math.min(e0.y, e3.y) - DET;
+  const maxX = Math.max(e0.x, e3.x) + DET;
+  const maxY = Math.max(e0.y, e3.y) + DET;
+
+  let cell = 20;
+  let cols = Math.ceil((maxX - minX) / cell);
+  let rows = Math.ceil((maxY - minY) / cell);
+  while (cols * rows > 9000) {
+    cell *= 1.5;
+    cols = Math.ceil((maxX - minX) / cell);
+    rows = Math.ceil((maxY - minY) / cell);
+  }
+  if (cols < 2 || rows < 2) return null;
+
+  const blockers = obstacles.concat([nodeRect(a), nodeRect(b)]).map((r) => inflate(r, 8));
+  const blocked = new Uint8Array(cols * rows);
+  for (let j = 0; j < rows; j++) {
+    for (let i = 0; i < cols; i++) {
+      const cx = minX + (i + 0.5) * cell;
+      const cy = minY + (j + 0.5) * cell;
+      for (const r of blockers) {
+        if (cx > r.x && cx < r.x + r.w && cy > r.y && cy < r.y + r.h) {
+          blocked[j * cols + i] = 1;
+          break;
+        }
+      }
+    }
+  }
+
+  const clampI = (x: number) => Math.max(0, Math.min(cols - 1, Math.round((x - minX) / cell - 0.5)));
+  const clampJ = (y: number) => Math.max(0, Math.min(rows - 1, Math.round((y - minY) / cell - 0.5)));
+  const si = clampI(e0.x);
+  const sj = clampJ(e0.y);
+  const gi = clampI(e3.x);
+  const gj = clampJ(e3.y);
+  blocked[sj * cols + si] = 0;
+  blocked[gj * cols + gi] = 0;
+
+  // A* with a turn penalty so paths prefer long straight runs.
+  const TURN = 4;
+  const DIRC = [
+    [1, 0],
+    [-1, 0],
+    [0, 1],
+    [0, -1],
+  ];
+  const key = (i: number, j: number, d: number) => (j * cols + i) * 3 + d;
+  const g = new Map<number, number>();
+  const came = new Map<number, number>();
+  const open: { f: number; g: number; i: number; j: number; d: number }[] = [];
+  const h = (i: number, j: number) => Math.abs(i - gi) + Math.abs(j - gj);
+  const startKey = key(si, sj, 2);
+  g.set(startKey, 0);
+  open.push({ f: h(si, sj), g: 0, i: si, j: sj, d: 2 });
+
+  let foundKey = -1;
+  while (open.length) {
+    let bi = 0;
+    for (let k = 1; k < open.length; k++) if (open[k].f < open[bi].f) bi = k;
+    const cur = open.splice(bi, 1)[0];
+    if (cur.i === gi && cur.j === gj) {
+      foundKey = key(cur.i, cur.j, cur.d);
+      break;
+    }
+    if (cur.g > (g.get(key(cur.i, cur.j, cur.d)) ?? Infinity)) continue;
+    for (let m = 0; m < 4; m++) {
+      const ni = cur.i + DIRC[m][0];
+      const nj = cur.j + DIRC[m][1];
+      if (ni < 0 || nj < 0 || ni >= cols || nj >= rows) continue;
+      if (blocked[nj * cols + ni]) continue;
+      const nd = DIRC[m][0] !== 0 ? 0 : 1;
+      const turn = cur.d !== 2 && cur.d !== nd ? TURN : 0;
+      const ng = cur.g + 1 + turn;
+      const nk = key(ni, nj, nd);
+      if (ng < (g.get(nk) ?? Infinity)) {
+        g.set(nk, ng);
+        came.set(nk, key(cur.i, cur.j, cur.d));
+        open.push({ f: ng + h(ni, nj), g: ng, i: ni, j: nj, d: nd });
+      }
+    }
+  }
+
+  if (foundKey < 0) return null;
+
+  const cells: Point[] = [];
+  let k: number | undefined = foundKey;
+  while (k !== undefined) {
+    const cellIdx = Math.floor(k / 3);
+    const i = cellIdx % cols;
+    const j = Math.floor(cellIdx / cols);
+    cells.push({ x: minX + (i + 0.5) * cell, y: minY + (j + 0.5) * cell });
+    k = came.get(k);
+  }
+  cells.reverse();
+  if (cells.length === 0) return null;
+
+  // snap the grid endpoints to the true stub points and stitch the anchors on
+  cells[0] = e0;
+  cells[cells.length - 1] = e3;
+  return simplify([p0, ...cells, p3]);
+}
+
+/**
+ * Pick a connector route: a clean orthogonal elbow when nothing is in the way,
+ * otherwise an A* route around the obstacles.
+ */
+export function routeEdge(
+  a: DiagramNode,
+  sideA: Side,
+  b: DiagramNode,
+  sideB: Side,
+  others: Rect[],
+): Point[] {
+  const simple = orthoPoints(a, sideA, b, sideB);
+  const clearRects = others.map((r) => inflate(r, 4));
+  if (pathClear(simple, clearRects)) return simple;
+  const around = routeAround(a, sideA, b, sideB, others);
+  return around ?? simple;
+}
+
 export function screenToWorld(sx: number, sy: number, vp: Viewport): Point {
   return { x: (sx - vp.x) / vp.zoom, y: (sy - vp.y) / vp.zoom };
 }
